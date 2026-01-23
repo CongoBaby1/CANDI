@@ -4,7 +4,7 @@ import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const BOOKING_TOOL: FunctionDeclaration = {
   name: "requestBookingConfirmation",
-  description: "Call this tool ONLY when you have collected all required booking details (Name, Phone, Email, Service, Date, Time, Technician) and have verbally summarized them to the user.",
+  description: "Call this tool ONLY when you have collected ALL required booking details (Name, Phone, Email, Service, Date, Time, Tech) and summarized them to the user.",
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -12,9 +12,9 @@ const BOOKING_TOOL: FunctionDeclaration = {
       phone: { type: Type.STRING, description: "Client's phone number" },
       email: { type: Type.STRING, description: "Client's email address" },
       service: { type: Type.STRING, description: "The specific service requested" },
-      date: { type: Type.STRING, description: "The appointment date (e.g. Monday, Dec 5th)" },
-      time: { type: Type.STRING, description: "The appointment time" },
-      tech: { type: Type.STRING, description: "The requested nail technician" }
+      date: { type: Type.STRING, description: "Appointment date" },
+      time: { type: Type.STRING, description: "Appointment time" },
+      tech: { type: Type.STRING, description: "Requested nail technician" }
     },
     required: ["first_name", "phone", "email", "service", "date", "time", "tech"]
   }
@@ -22,7 +22,7 @@ const BOOKING_TOOL: FunctionDeclaration = {
 
 const TERMINATE_TOOL: FunctionDeclaration = {
   name: "terminateSession",
-  description: "Call this tool to deactivate the agent and close the window when the user says they are finished or don't need further help."
+  description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
 };
 
 const getSystemInstruction = (teamNames: string[] = []) => {
@@ -31,54 +31,28 @@ const getSystemInstruction = (teamNames: string[] = []) => {
     : "Candi, Sarah, James, or First Available";
 
   return `
-You are Candi Nails & Spa’s AI Voice, the official AI assistant.
+You are Candi Nails & Spa’s official AI Voice. 
 
-MANDATORY OPENING PROTOCOL:
-The VERY FIRST thing you say in every session MUST be exactly this phrase:
-"Hey Love. I am Candi Nails & Spa's AI Voice, the official assistant here. I can help with any questions, booking, rescheduling, or canceling appointments. How may I assist you today?"
+GREETING:
+Start EVERY session with: "Hey Love. I am Candi Nails & Spa's AI Voice, the official assistant here. I can help with any questions, booking, rescheduling, or canceling appointments. How may I assist you today?"
 
-Do not vary this. Do not say "Hello" or "How can I help" before this. Lead with "Hey Love."
+ROLE:
+- Book/Reschedule/Cancel appointments.
+- Answer questions about nail care, trends, and beauty advice using Google Search if needed.
+- Admin access: "${BUSINESS_INFO.adminPhrase}".
 
-You are responsible for:
-- Speaking automatically when users click the agent icon
-- Booking, rescheduling, and canceling appointments
-- Capturing leads
-- Managing multi-employee calendars
-- Saving data into CRM
-- Handling email notifications
-- Triggering a pop-up confirmation window
-- Switching between voice mode and chat mode
-- Entering admin mode via secret phrase ("${BUSINESS_INFO.adminPhrase}")
+RULES:
+1. Ask ONLY ONE question at a time.
+2. Ask for email spelling: "Could you please spell that out for me?"
+3. Technicians: ${techniciansList}.
+4. Summary: Summarize all details before calling 'requestBookingConfirmation'.
 
-PERSONALITY:
-Professional, friendly, courteous, warm, and personable. Never robotic.
+SERVICES: ${INITIAL_SERVICES.map(s => `${s.name} (${s.price})`).join(", ")}.
+HOURS: Mon-Sat ${BUSINESS_INFO.hours.mon_sat}, Sun ${BUSINESS_INFO.hours.sun}.
+ADDRESS: ${BUSINESS_INFO.address}.
 
-COMMUNICATION RULES:
-1. Ask ONLY one question at a time. Never bundle multiple requests for information into a single turn.
-2. When asking the user for their email address, you MUST explicitly ask them to spell it out to ensure 100% accuracy.
-
-BOOKING WORKFLOW:
-Collect info one-by-one: First name, Phone, Email (ask to spell it), Service, Date, Time, Nail tech.
-Technicians available: ${techniciansList}.
-
-After collecting all details, you MUST:
-1. Verbally summarize all booking details.
-2. Ask if the information is correct.
-3. If confirmed, call 'requestBookingConfirmation'.
-
-POST-CONFIRMATION:
-Once confirmed, say exactly: “Perfect! Your appointment has been successfully booked. Is there anything else I can help you with?”
-
-EXIT PROTOCOL:
-If the user indicates they are finished, says "No" to your offer of further help, or says goodbye, you MUST call 'terminateSession' to deactivate the agent immediately.
-
-CANCELLATIONS:
-- Must be made 24+ hours before.
-- If inside 24 hours, say: “Cancellations must be at least 24 hours in advance. Would you like to reschedule instead?”
-
-Business Info: ${BUSINESS_INFO.name}, ${BUSINESS_INFO.address}.
-Hours: Mon-Sat ${BUSINESS_INFO.hours.mon_sat}, Sun ${BUSINESS_INFO.hours.sun}.
-Services: ${INITIAL_SERVICES.map(s => `${s.name}: ${s.price}`).join(", ")}.
+POST-BOOKING: "Perfect! Your appointment has been successfully booked. Is there anything else I can help you with?"
+EXIT: Call 'terminateSession' if the user is done.
 `;
 };
 
@@ -102,7 +76,7 @@ export const startLiveSession = async (callbacks: any, teamNames: string[] = [])
         },
         tools: [{ functionDeclarations: [BOOKING_TOOL, TERMINATE_TOOL] }],
         systemInstruction: getSystemInstruction(teamNames),
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: { thinkingBudget: 0 }, 
         inputAudioTranscription: {},
         outputAudioTranscription: {}
       },
@@ -130,14 +104,25 @@ export const generateChatResponse = async (message: string, history: any[] = [],
       contents,
       config: { 
         systemInstruction: getSystemInstruction(teamNames),
-        tools: [{ functionDeclarations: [BOOKING_TOOL, TERMINATE_TOOL] }],
+        tools: [{ functionDeclarations: [BOOKING_TOOL, TERMINATE_TOOL] }, { googleSearch: {} }],
         thinkingConfig: { thinkingBudget: 0 }
       },
     });
-    return response.text || "";
+
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.map((chunk: any) => chunk.web)
+      .filter(Boolean);
+
+    return {
+      text: response.text || "",
+      sources: sources || []
+    };
   } catch (error) {
     console.error("[GeminiService] Chat generation failed:", error);
-    return "I'm having trouble connecting to my service. Could you please try again?";
+    return {
+      text: "I'm having trouble connecting to my service. Could you please try again?",
+      sources: []
+    };
   }
 };
 

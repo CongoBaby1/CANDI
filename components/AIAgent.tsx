@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2 } from 'lucide-react';
+import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2, ExternalLink } from 'lucide-react';
 import { 
   startLiveSession, 
   generateChatResponse, 
@@ -109,9 +109,9 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
     setIsOpen(false);
   }, [stopAllAudio]);
 
-  const addMessage = (role: 'user' | 'agent', text: string) => {
+  const addMessage = (role: 'user' | 'agent', text: string, sources: any[] = []) => {
     if (!text.trim()) return;
-    const newMessage = { id: Math.random().toString(36), role, text, timestamp: new Date() };
+    const newMessage = { id: Math.random().toString(36), role, text, sources, timestamp: new Date() };
     setMessages(prev => [...prev, newMessage]);
 
     const normalized = (t: string) => t.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
@@ -136,22 +136,22 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
         onopen: async () => {
           try {
             const stream = await streamPromise;
+            const session = await sessionPromise;
             setIsConnecting(false);
             setIsAgentSpeaking(true);
             const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
-            // Reduced buffer size from 4096 to 2048 to reduce capture latency
-            const processor = inputAudioContextRef.current!.createScriptProcessor(2048, 1, 1);
+            const processor = inputAudioContextRef.current!.createScriptProcessor(1024, 1, 1);
             processor.onaudioprocess = (e) => {
               if (!isVoiceActiveRef.current) return;
               const pcmBlob = floatToPcm(e.inputBuffer.getChannelData(0));
-              sessionPromise.then(s => s.sendRealtimeInput({ media: pcmBlob }));
+              session.sendRealtimeInput({ media: pcmBlob });
             };
             source.connect(processor);
             processor.connect(inputAudioContextRef.current!.destination);
             
-            sessionPromise.then(s => s.sendRealtimeInput({ 
+            session.sendRealtimeInput({ 
               text: "CONVERSATION_START: Please state your official opening statement exactly as defined in your instructions." 
-            }));
+            });
           } catch (micErr) {
             setErrorState("Microphone access denied.");
             setIsConnecting(false);
@@ -196,7 +196,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
               }
 
               if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) {
-                setTimeout(closeSession, 500);
+                setTimeout(closeSession, 200);
               }
             });
             
@@ -248,7 +248,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
     if (isVoiceMode) { setIsVoiceMode(false); stopAllAudio(); }
     try {
       const response = await generateChatResponse(msg, chatHistoryRef.current, teamNames);
-      addMessage('agent', response);
+      addMessage('agent', response.text, response.sources);
     } catch (err) {
       addMessage('agent', "I'm having a bit of trouble connecting. Try again?");
     }
@@ -301,12 +301,21 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
                 </div>
               )}
               {messages.map(m => (
-                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
+                <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2`}>
                   <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm leading-relaxed ${
                     m.role === 'user' ? 'bg-slate-900 text-white rounded-br-none shadow-lg' : 'bg-white border border-pink-100/50 text-slate-800 rounded-bl-none shadow-sm'
                   }`}>
                     {m.text}
                   </div>
+                  {m.sources && m.sources.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2 px-2">
+                      {m.sources.map((s: any, idx: number) => (
+                        <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500 hover:border-pink-300 hover:text-pink-500 transition shadow-sm">
+                          <ExternalLink size={10} /> {s.title || 'Source'}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {isConnecting && (

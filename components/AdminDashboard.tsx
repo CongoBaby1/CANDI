@@ -42,6 +42,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingMember, setEditingMember] = useState<Technician | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', email: '', calendar_email: '' });
+  const [dbStatus, setDbStatus] = useState<'connected' | 'error' | 'checking'>('checking');
+
+  useEffect(() => {
+    const checkDb = async () => {
+      try {
+        const stats = await db.getStats();
+        setDbStatus(stats ? 'connected' : 'error');
+      } catch {
+        setDbStatus('error');
+      }
+    };
+    checkDb();
+  }, [refreshData]);
 
   const handleAddMember = async () => {
     if (!newMember.name || !newMember.email) {
@@ -120,9 +133,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="flex h-screen bg-[#f8fafd] overflow-hidden">
+    <div className="flex h-screen bg-[#f8fafd] overflow-hidden text-slate-900">
       <aside className="w-64 bg-[#111827] text-white flex flex-col shrink-0">
-        <div className="p-8"><span className="text-xl font-bold font-serif italic">Candi Nails <span className="text-pink-500">& Spa</span></span></div>
+        <div className="p-8">
+          <span className="text-xl font-bold font-serif italic">Candi Nails <span className="text-pink-500">& Spa</span></span>
+        </div>
+        
+        <div className="px-6 mb-8">
+          <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl border border-white/5">
+            <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-green-500 animate-pulse' : dbStatus === 'error' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cloud Sync</p>
+              <p className="text-[10px] font-bold text-white capitalize">{dbStatus}</p>
+            </div>
+          </div>
+        </div>
+
         <nav className="flex-1 px-4 space-y-1">
           {[
             { id: 'bookings', label: 'Bookings', icon: Calendar },
