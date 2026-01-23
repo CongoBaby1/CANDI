@@ -1,0 +1,7 @@
+{
+  "name": "Candi Nails & Spa - AI Powered Beauty Hub",
+  "description": "A luxury nail salon experience featuring an integrated Gemini AI assistant for real-time bookings, lead capture, and an advanced admin dashboard.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
