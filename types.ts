@@ -1,9 +1,9 @@
 
 export enum ServiceCategory {
-  MANICURE = 'Manicures',
-  PEDICURE = 'Pedicures',
-  ENHANCEMENT = 'Nail Enhancements',
-  WAXING = 'Waxing'
+  CONSULTATION = 'Consultation',
+  NURSERY = 'The Nursery',
+  ENVIRONMENT = 'Environment',
+  CURING = 'Curing & Drying'
 }
 
 export interface Service {
@@ -13,58 +13,35 @@ export interface Service {
   price: string;
 }
 
-export interface Booking {
+export interface Consultation {
   id: string;
-  lead_id: string; 
-  first_name: string;
-  phone: string;
-  email: string;
-  service: string;
-  date: string;
-  time: string;
-  tech: string;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'rescheduled';
+  grower_id: string; 
+  client_name: string;
+  contact: string;
+  stage: string;
+  temperature: string;
+  humidity: string;
+  recommended_action: string;
+  status: 'active' | 'archived' | 'flagged';
   is_ai_confirmed: boolean; 
   created_at: string;
-  original_booking_id?: string;
 }
 
-export interface Lead {
+export interface Grower {
   id: string;
   name: string;
-  phone: string;
-  email: string;
-  service: string;
-  notes: string;
+  contact: string;
+  status: 'New' | 'Consulting' | 'On-Protocol' | 'Closed';
   source: string;
-  status: 'New' | 'Interested' | 'Booked' | 'Closed';
-  type: string;
   created_at: string;
 }
 
-export interface DayAvailability {
-  isOpen: boolean;
-  start: string;
-  end: string;
-}
-
-export interface WeekAvailability {
-  monday: DayAvailability;
-  tuesday: DayAvailability;
-  wednesday: DayAvailability;
-  thursday: DayAvailability;
-  friday: DayAvailability;
-  saturday: DayAvailability;
-  sunday: DayAvailability;
-}
-
-export interface Technician {
+export interface Cultivator {
   id: string;
   name: string;
+  role: string;
   email: string;
-  calendar_email: string;
-  is_synced: boolean;
-  availability: WeekAvailability;
+  is_active: boolean;
 }
 
 export interface SystemLog {

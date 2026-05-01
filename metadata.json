@@ -1,7 +1,8 @@
 {
-  "name": "Candi Nails & Spa - AI Powered Beauty Hub",
-  "description": "A luxury nail salon experience featuring an integrated Gemini AI assistant for real-time bookings, lead capture, and an advanced admin dashboard.",
+  "name": "The Green Genie",
+  "description": "Your expert AI agricultural consultant specializing in pharmaceutical-grade cultivation and environmental precision.",
   "requestFramePermissions": [
     "microphone"
-  ]
+  ],
+  "majorCapabilities": []
 }

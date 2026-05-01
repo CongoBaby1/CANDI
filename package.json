@@ -1,5 +1,5 @@
 {
-  "name": "candi-nails-&-spa---ai-powered-beauty-hub",
+  "name": "the-green-genie",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,11 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.38.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "@google/genai": "^1.38.0",
-    "lucide-react": "^0.562.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

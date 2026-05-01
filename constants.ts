@@ -2,30 +2,25 @@
 import { ServiceCategory, Service } from './types';
 
 export const BUSINESS_INFO = {
-  name: "Candi Nails & Spa",
-  address: "25 Cornwell Dr, Bridgeton, NJ 08302",
-  phone: "856-455-8989",
+  name: "The Green Genie",
+  address: "Digital Protocol Hub | Pharmaceutical Grade",
+  phone: "1-800-GROW-VPD",
   hours: {
-    mon_sat: "7 AM – 9 PM",
-    sun: "Closed"
+    mon_sat: "24/7 Monitoring",
+    sun: "Autonomous Mode"
   },
-  adminPhrase: "Candi Nails 25 Cornwell Drive"
+  adminPhrase: "Green Genie Protocol 2026 Schedule III"
 };
 
 export const INITIAL_SERVICES: Service[] = [
-  { id: 'm1', category: ServiceCategory.MANICURE, name: 'Basic Manicure', price: '$20–$25' },
-  { id: 'm2', category: ServiceCategory.MANICURE, name: 'Gel Manicure (Shellac)', price: '$30–$40' },
-  { id: 'm3', category: ServiceCategory.MANICURE, name: 'Dip Powder (SNS)', price: '$40–$50' },
-  { id: 'p1', category: ServiceCategory.PEDICURE, name: 'Regular Pedicure', price: '$30–$40' },
-  { id: 'p2', category: ServiceCategory.PEDICURE, name: 'Spa/Deluxe Pedicure', price: '$45–$60' },
-  { id: 'p3', category: ServiceCategory.PEDICURE, name: 'Gel Pedicure', price: '$45–$65' },
-  { id: 'e1', category: ServiceCategory.ENHANCEMENT, name: 'Acrylic Full Set', price: '$45–$60+' },
-  { id: 'e2', category: ServiceCategory.ENHANCEMENT, name: 'Acrylic Refill', price: '$30–$45' },
-  { id: 'e3', category: ServiceCategory.ENHANCEMENT, name: 'Gel-X/UV Gel', price: '$55–$75' },
-  { id: 'e4', category: ServiceCategory.ENHANCEMENT, name: 'Pink & White French Set', price: '$60–$75' },
-  { id: 'w1', category: ServiceCategory.WAXING, name: 'Eyebrow Wax', price: '$10–$15' },
-  { id: 'w2', category: ServiceCategory.WAXING, name: 'Lip/Chin Wax', price: '$8–$12' },
-  { id: 'w3', category: ServiceCategory.WAXING, name: 'Full Face Wax', price: '$35–$45' }
+  { id: 's1', category: ServiceCategory.CONSULTATION, name: 'VPD Analysis & Calibration', price: 'Technical Audit' },
+  { id: 's2', category: ServiceCategory.CONSULTATION, name: 'Nursery Protocol Setup', price: 'Scale Audit' },
+  { id: 's3', category: ServiceCategory.NURSERY, name: 'Genetics Stabilization', price: 'Lab Service' },
+  { id: 's4', category: ServiceCategory.NURSERY, name: 'Pathogen Detection Scan', price: 'Diagnostic' },
+  { id: 's5', category: ServiceCategory.ENVIRONMENT, name: 'LED Spectrum Optimization', price: 'Calibration' },
+  { id: 's6', category: ServiceCategory.ENVIRONMENT, name: 'HVAC-D Precision Tuning', price: 'Optimization' },
+  { id: 's7', category: ServiceCategory.CURING, name: 'Cryopathic Curing Protocol', price: 'Terpene Lock' },
+  { id: 's8', category: ServiceCategory.CURING, name: 'Moisture Activity Mapping', price: 'Stability' }
 ];
 
-export const HERO_IMAGE = "https://i.imgur.com/PJAqG7y.png";
+export const HERO_IMAGE = "https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&q=80&w=2000";

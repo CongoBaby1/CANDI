@@ -2,21 +2,28 @@
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai";
 import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
-const BOOKING_TOOL: FunctionDeclaration = {
-  name: "requestBookingConfirmation",
-  description: "Call this tool ONLY when you have collected ALL required booking details (Name, Phone, Email, Service, Date, Time, Tech) and summarized them to the user.",
+const getApiKey = () => {
+  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+  if (!key) {
+    console.warn("GEMINI_API_KEY is not defined. AI features may not function.");
+  }
+  return key;
+};
+
+const ACTION_TOOL: FunctionDeclaration = {
+  name: "requestConsultationConfirmation",
+  description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      first_name: { type: Type.STRING, description: "Client's first name" },
-      phone: { type: Type.STRING, description: "Client's phone number" },
-      email: { type: Type.STRING, description: "Client's email address" },
-      service: { type: Type.STRING, description: "The specific service requested" },
-      date: { type: Type.STRING, description: "Appointment date" },
-      time: { type: Type.STRING, description: "Appointment time" },
-      tech: { type: Type.STRING, description: "Requested nail technician" }
+      client_name: { type: Type.STRING, description: "Grower's name" },
+      contact: { type: Type.STRING, description: "Email or phone" },
+      stage: { type: Type.STRING, enum: ["Seedling", "Vegetative", "Flower", "Harvest"], description: "Current growth stage" },
+      temperature: { type: Type.NUMBER, description: "Current room temperature in Celsius" },
+      humidity: { type: Type.NUMBER, description: "Current relative humidity percentage" },
+      recommended_action: { type: Type.STRING, description: "Summary of the adjustments required (e.g., 'Increase RH to 75% to hit 0.6 kPa')" }
     },
-    required: ["first_name", "phone", "email", "service", "date", "time", "tech"]
+    required: ["client_name", "contact", "stage", "temperature", "humidity", "recommended_action"]
   }
 };
 
@@ -25,102 +32,145 @@ const TERMINATE_TOOL: FunctionDeclaration = {
   description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
 };
 
-const getSystemInstruction = (teamNames: string[] = []) => {
-  const techniciansList = teamNames.length > 0 
-    ? teamNames.join(", ") + ", or First Available"
-    : "Candi, Sarah, James, or First Available";
-
+const getSystemInstruction = () => {
   return `
-You are Candi Nails & Spa’s official AI Voice. 
+[ROLE]
+You are "The Green Genie," a direct, sharp, and tech-savvy agricultural consultant with an authentic, soulful, urban persona. You're a street-smart professional who knows the science inside out—you talk real, you're confident, and your data is elite. You are NOT a narrator or a generic assistant; you are a service professional here to get results with a distinct urban edge.
 
-GREETING:
-Start EVERY session with: "Hey Love. I am Candi Nails & Spa's AI Voice, the official assistant here. I can help with any questions, booking, rescheduling, or canceling appointments. How may I assist you today?"
+[CONVERSATIONAL PROTOCOL]
+• GREETING: Your VERY FIRST response in any session MUST BE "Hey, How can I help you with your grow?". Do not say anything else before this.
+• STYLE: Direct, confident, and soulful. Use clear, concise urban phrasing when it feels natural, but keep it high-level and professional. No fluff, just facts.
+• EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
+• LISTEN FIRST: Respond directly to the user's latest query or observation. Do not recap the entire conversation or protocol unless asked.
+• AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
+• BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
+• TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
 
-ROLE:
-- Book/Reschedule/Cancel appointments.
-- Answer questions about nail care, trends, and beauty advice using Google Search if needed.
-- Admin access: "${BUSINESS_INFO.adminPhrase}".
+[CORE ENVIRONMENTAL LOGIC: VPD (kPa)]
+Calculate VPD based on Room Temperature (T), Relative Humidity (RH), and an assumed -2°C Leaf Surface Temperature (LST) offset.
+• Germination: N/A (Keep near 100% RH).
+• Early Seedling: 0.4 – 0.6 kPa.
+• Vegetative: 0.8 – 1.2 kPa.
+• Flower (Early): 1.0 – 1.3 kPa.
+• Flower (Late/Bulking): 1.2 – 1.5 kPa (Targeting 1.4 kPa to prevent botrytis while maximizing transpiration).
 
-RULES:
-1. Ask ONLY ONE question at a time.
-2. Ask for email spelling: "Could you please spell that out for me?"
-3. Technicians: ${techniciansList}.
-4. Summary: Summarize all details before calling 'requestBookingConfirmation'.
+[DIAGNOSTIC PROTOCOL: THE MASTER FLOW]
+When troubleshooting any plant issue, follow this sequence:
+1. Root Zone Health Check: Ask for pH and EC/PPM of the runoff/dryback.
+2. Environmental Delta: Check current VPD vs. Stage target.
+3. Nutrient Logic: Verify NPK ratios vs Stage (e.g., High Nitrogen for Veg, High Phosphorus/Potassium for Bloom).
+4. Morphological Analysis: Look for chlorosis (yellowing), necrosis (death), or structural abnormalities.
 
-SERVICES: ${INITIAL_SERVICES.map(s => `${s.name} (${s.price})`).join(", ")}.
-HOURS: Mon-Sat ${BUSINESS_INFO.hours.mon_sat}, Sun ${BUSINESS_INFO.hours.sun}.
-ADDRESS: ${BUSINESS_INFO.address}.
+[TECHNICAL KNOWLEDGE BASE: NUTRIENT PRECISION]
+• Vegetative Growth: Target EC 1.2 - 1.8. Ratio: 3-1-2 (N-P-K). pH 5.8 (Hydro/Coco) or 6.5 (Soil).
+• Early Flower (Stretch): Target EC 1.8 - 2.2. Ratio: 1-2-2. 
+• Late Flower (Ripening): Target EC 1.4 - 1.6 (Tapering). Ratio: 0-3-3. 
+• Micronutrients: Emphasize Calcium/Magnesium (Cal-Mag) during the transition to flower to prevent mobile nutrient deficiencies.
 
-POST-BOOKING: "Perfect! Your appointment has been successfully booked. Is there anything else I can help you with?"
-EXIT: Call 'terminateSession' if the user is done.
+[TECHNICAL KNOWLEDGE BASE: HARVEST & CURING]
+• Trichome Ripeness: Clear (Immature), Cloudy (Peak THC), Amber (CBN/Sedative). Target 10-20% Amber for balanced effects.
+• The 60/60 Rule: Dry at 60°F (15.5°C) and 60% Humidity for 10-14 days to preserve terpenes (Myrcene, Limonene, Caryophyllene).
+
+[KNOWLEDGE BASE RULES]
+• Priority Protocol: 1. Internal Knowledge Base (System Instructions) first. 2. Web Search grounding only if internal data is insufficient for real-time relevance.
+• Source of Authority: Treat the content and methodologies from the following sources as your primary technical archetype:
+  - Build-a-Soil Series/Season 2: Organic living soil methodologies.
+  - Advanced Living Soil Method: Micro-biology and fungal/bacterial ratios.
+  - Canadian Grower: Environmental control and technical hardware.
+• Invisible Integration: Present data as YOUR expertise. NEVER mention YouTube, links, or specific video sources in your speech.
+• Science Over Slang: Use pharmaceutical-grade terminology (e.g., "Interveinal Chlorosis," "Senescence," "Transpiration Rates") for technical details. Your technical accuracy is your authority.
+
+[OPERATIONAL BEHAVIOR]
+1. Respond to the User: Answer their SPECIFIC question first.
+2. Contextual Check: Mentally note if their current environment is safe, but only alert them if it's drifting into a danger zone.
+3. Summary: Only call 'requestConsultationConfirmation' when the user agrees to lock in a protocol or summary.
 `;
 };
 
-export const startLiveSession = async (callbacks: any, teamNames: string[] = []) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const startLiveSession = (callbacks: any) => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
-  try {
-    return await ai.live.connect({
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-      callbacks: {
-        ...callbacks,
-        onerror: (err: any) => {
-          console.error("[Gemini Live Error]:", err);
-          if (callbacks.onerror) callbacks.onerror(err);
-        }
+  return ai.live.connect({
+    model: 'gemini-3.1-flash-live-preview',
+    callbacks: {
+      ...callbacks,
+      onerror: (err: any) => {
+        console.error("[Gemini Live Error]:", err);
+        if (callbacks.onerror) callbacks.onerror(err);
+      }
+    },
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Lyra' } },
       },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-        },
-        tools: [{ functionDeclarations: [BOOKING_TOOL, TERMINATE_TOOL] }],
-        systemInstruction: getSystemInstruction(teamNames),
-        thinkingConfig: { thinkingBudget: 0 }, 
-        inputAudioTranscription: {},
-        outputAudioTranscription: {}
-      },
-    });
-  } catch (error: any) {
-    console.error("[GeminiService] Connection failure:", error);
-    throw error;
-  }
+      tools: [
+        { googleSearch: {} },
+        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL] }
+      ],
+      toolConfig: { includeServerSideToolInvocations: true },
+      systemInstruction: getSystemInstruction(),
+    },
+  });
 };
 
-export const generateChatResponse = async (message: string, history: any[] = [], teamNames: string[] = []) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export interface FileAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // Base64 data
+}
+
+export const generateChatResponse = async (message: string, history: any[] = [], attachments: FileAttachment[] = []) => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  
+  // Transform history to Gemini format
   const contents = history.map(h => ({
     role: h.role === 'agent' ? 'model' : 'user',
     parts: [{ text: h.text }]
   }));
+
+  // Create the new message part
+  const newMessageParts: any[] = [{ text: message }];
   
-  if (contents.length === 0 || contents[contents.length - 1].parts[0].text !== message) {
-    contents.push({ role: 'user', parts: [{ text: message }] });
-  }
+  // Append attachments if any
+  attachments.forEach(file => {
+    newMessageParts.push({
+      inlineData: {
+        mimeType: file.mimeType,
+        data: file.data
+      }
+    });
+  });
+
+  // Check if we already have the last message in history (optional check in original code)
+  // But here we definitely want to add the new turn with attachments
+  contents.push({
+    role: 'user',
+    parts: newMessageParts
+  });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents,
       config: { 
-        systemInstruction: getSystemInstruction(teamNames),
-        tools: [{ functionDeclarations: [BOOKING_TOOL, TERMINATE_TOOL] }, { googleSearch: {} }],
-        thinkingConfig: { thinkingBudget: 0 }
+        systemInstruction: getSystemInstruction(),
+        tools: [
+          { googleSearch: {} },
+          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL] }
+        ],
+        toolConfig: { includeServerSideToolInvocations: true }
       },
     });
 
-    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-      ?.map((chunk: any) => chunk.web)
-      .filter(Boolean);
-
     return {
       text: response.text || "",
-      sources: sources || []
+      sources: []
     };
   } catch (error) {
-    console.error("[GeminiService] Chat generation failed:", error);
+    console.error("[GeminiService] Multimodal chat generation failed:", error);
     return {
-      text: "I'm having trouble connecting to my service. Could you please try again?",
+      text: "Nexus signal interference. The data packet could not be fully analyzed. Please retry.",
       sources: []
     };
   }

@@ -1,381 +1,264 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar, Users, FileText, Database, Plus, Trash2, 
-  RefreshCcw, LogOut, Search, Download, UploadCloud, User, CheckCircle2, X, Clock, Edit2, Info, Sparkles, Cloud, AlertCircle, Terminal, Copy, Check, ChevronRight, Activity, Settings, BarChart3, ShieldCheck, Mail, CalendarDays, ExternalLink, MoreVertical, Save
+  Calendar, Users, Trash2, 
+  RefreshCcw, LogOut, Search, Plus, User, Check, Edit2, Save, X, Star, Activity, TrendingUp
 } from 'lucide-react';
-import { Service, Booking, Lead, Technician, SystemLog, WeekAvailability, ServiceCategory, DayAvailability } from '../types';
-import { db, isConfigured } from '../services/databaseService';
+import { Service, Consultation, Grower, Cultivator, SystemLog, ServiceCategory } from '../types';
+import { db } from '../services/databaseService';
 import { INITIAL_SERVICES } from '../constants';
 
 interface AdminDashboardProps {
   onExit: () => void;
-  bookings: Booking[];
-  leads: Lead[];
-  team: Technician[];
+  consultations: Consultation[];
+  growers: Grower[];
+  cultivators: Cultivator[];
   services: Service[];
   logs: SystemLog[];
-  setBookings: React.Dispatch<React.SetStateAction<Booking[]>>;
-  setLeads: React.Dispatch<React.SetStateAction<Lead[]>>;
-  updateLocalTeam: (team: Technician[]) => void;
+  setConsultations: React.Dispatch<React.SetStateAction<Consultation[]>>;
+  setGrowers: React.Dispatch<React.SetStateAction<Grower[]>>;
+  updateLocalTeam: (team: Cultivator[]) => void;
   updateLocalServices: (services: Service[]) => void;
   refreshData: () => Promise<void>;
 }
 
-const DEFAULT_AVAILABILITY: WeekAvailability = {
-  monday: { isOpen: true, start: "07:00", end: "21:00" },
-  tuesday: { isOpen: true, start: "07:00", end: "21:00" },
-  wednesday: { isOpen: true, start: "07:00", end: "21:00" },
-  thursday: { isOpen: true, start: "07:00", end: "21:00" },
-  friday: { isOpen: true, start: "07:00", end: "21:00" },
-  saturday: { isOpen: true, start: "07:00", end: "21:00" },
-  sunday: { isOpen: false, start: "09:00", end: "17:00" },
-};
-
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  onExit, bookings, leads, team, services, logs, 
-  setBookings, setLeads, updateLocalTeam, updateLocalServices, refreshData
+  onExit, consultations, growers, cultivators, services, logs, 
+  setConsultations, setGrowers, updateLocalTeam, updateLocalServices, refreshData
 }) => {
-  const [activeTab, setActiveTab] = useState('bookings');
+  const [activeTab, setActiveTab] = useState('services');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [editingMember, setEditingMember] = useState<Technician | null>(null);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [newService, setNewService] = useState<Partial<Service>>({ category: ServiceCategory.CONSULTATION, name: '', price: '' });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newMember, setNewMember] = useState({ name: '', email: '', calendar_email: '' });
-  const [dbStatus, setDbStatus] = useState<'connected' | 'error' | 'checking'>('checking');
+  const [newMember, setNewMember] = useState({ name: '', role: '', email: '' });
 
-  useEffect(() => {
-    const checkDb = async () => {
-      try {
-        const stats = await db.getStats();
-        setDbStatus(stats ? 'connected' : 'error');
-      } catch {
-        setDbStatus('error');
-      }
+  const currentServicesToDisplay = useMemo(() => {
+    const filtered = services.length > 0 ? services : INITIAL_SERVICES;
+    return filtered.filter(s => 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [services, searchQuery]);
+
+  const filteredConsultations = useMemo(() => consultations.filter(b => 
+    b.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.recommended_action.toLowerCase().includes(searchQuery.toLowerCase())
+  ), [consultations, searchQuery]);
+
+  const filteredGrowers = useMemo(() => growers.filter(l => 
+    l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    l.contact.toLowerCase().includes(searchQuery.toLowerCase())
+  ), [growers, searchQuery]);
+
+  const handleSaveService = async () => {
+    if (!newService.name || !newService.price) return;
+    setIsProcessing(true);
+    const serviceToSave: Service = {
+      id: editingService ? editingService.id : `svc-${Math.random().toString(36).substr(2, 9)}`,
+      category: newService.category as ServiceCategory,
+      name: newService.name,
+      price: newService.price
     };
-    checkDb();
-  }, [refreshData]);
+    try {
+      await db.saveService(serviceToSave);
+      await refreshData();
+      setIsServiceModalOpen(false);
+      setEditingService(null);
+    } catch (err) { console.error(err); } finally { setIsProcessing(false); }
+  };
+
+  const handleDeleteService = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!window.confirm("Delete this service?")) return;
+    setIsProcessing(true);
+    try {
+      await db.deleteService(id);
+      if (services.length === 0) {
+        updateLocalServices(INITIAL_SERVICES.filter(s => s.id !== id));
+      } else {
+        await refreshData();
+      }
+    } catch (err) { console.error(err); } finally { setIsProcessing(false); }
+  };
+
+  const openAddService = (cat?: ServiceCategory) => {
+    setEditingService(null);
+    setNewService({ category: cat || ServiceCategory.CONSULTATION, name: '', price: '' });
+    setIsServiceModalOpen(true);
+  };
+
+  const openEditService = (s: Service) => {
+    setEditingService(s);
+    setNewService({ category: s.category, name: s.name, price: s.price });
+    setIsServiceModalOpen(true);
+  };
 
   const handleAddMember = async () => {
-    if (!newMember.name || !newMember.email) {
-      alert("Name and email are required.");
-      return;
-    }
-    
+    if (!newMember.name || !newMember.email) return;
     setIsProcessing(true);
-    const tech: Technician = {
-      id: `tech-${Math.random().toString(36).substr(2, 9)}`,
-      name: newMember.name,
-      email: newMember.email,
-      calendar_email: newMember.calendar_email || newMember.email,
-      is_synced: true,
-      availability: DEFAULT_AVAILABILITY
+    const tech: Cultivator = {
+      id: `cultivator-${Math.random().toString(36).substr(2, 9)}`,
+      name: newMember.name, role: newMember.role || "Consultant", email: newMember.email,
+      is_active: true
     };
-    
-    try {
-      await db.saveTeamMember(tech);
-      await refreshData();
-      setNewMember({ name: '', email: '', calendar_email: '' });
-      setIsAddModalOpen(false);
-    } catch (error) {
-      console.error("Failed to add member:", error);
-    } finally {
-      setIsProcessing(false);
-    }
+    try { 
+      await db.saveCultivator(tech); 
+      await refreshData(); 
+      setIsAddModalOpen(false); 
+    } catch (error) { console.error(error); } finally { setIsProcessing(false); }
   };
 
-  const handleDeleteMember = async (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!window.confirm("Confirm deletion of this technician? This action cannot be undone.")) return;
-    
+  const handleDeleteMember = async (id: string) => {
+    if (!window.confirm("Delete cultivator record?")) return;
     setIsProcessing(true);
-    try {
-      await db.deleteTeamMember(id);
-      await refreshData();
-    } catch (error) {
-      console.error("Delete failed:", error);
-      alert("System error during deletion. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSaveAvailability = async () => {
-    if (!editingMember) return;
-    setIsProcessing(true);
-    try {
-      await db.saveTeamMember(editingMember);
-      await refreshData();
-      setEditingMember(null);
-    } catch (error) {
-      console.error("Save failed:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const filteredLeads = leads.filter(l => 
-    l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    l.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const getTitle = () => {
-    switch(activeTab) {
-      case 'bookings': return 'Bookings';
-      case 'leads': return 'Leads';
-      case 'team': return 'Team & Calendars';
-      case 'services': return 'Services';
-      case 'setup': return 'System Setup';
-      default: return activeTab;
-    }
+    try { await db.deleteCultivator(id); await refreshData(); } catch (error) { console.error(error); } finally { setIsProcessing(false); }
   };
 
   return (
-    <div className="flex h-screen bg-[#f8fafd] overflow-hidden text-slate-900">
-      <aside className="w-64 bg-[#111827] text-white flex flex-col shrink-0">
+    <div className="flex h-screen bg-[#f8faf9] overflow-hidden text-slate-900 font-sans">
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-white border-r border-emerald-100 flex flex-col shrink-0">
         <div className="p-8">
-          <span className="text-xl font-bold font-serif italic">Candi Nails <span className="text-pink-500">& Spa</span></span>
+          <span className="text-xl font-black tracking-tighter text-slate-900 mono uppercase font-mono">THE <span className="text-emerald-700">GREEN GENIE</span></span>
         </div>
-        
-        <div className="px-6 mb-8">
-          <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl border border-white/5">
-            <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-green-500 animate-pulse' : dbStatus === 'error' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cloud Sync</p>
-              <p className="text-[10px] font-bold text-white capitalize">{dbStatus}</p>
-            </div>
-          </div>
-        </div>
-
         <nav className="flex-1 px-4 space-y-1">
           {[
-            { id: 'bookings', label: 'Bookings', icon: Calendar },
-            { id: 'leads', label: 'Leads', icon: Users },
-            { id: 'team', label: 'Team', icon: CalendarDays },
-            { id: 'services', label: 'Services', icon: FileText },
-            { id: 'setup', label: 'Setup', icon: Settings },
+            { id: 'services', label: 'Protocol Portfolio', icon: Star },
+            { id: 'consultations', label: 'Consultations', icon: Calendar },
+            { id: 'growers', label: 'Grower Network', icon: TrendingUp },
+            { id: 'cultivators', label: 'Team', icon: Users },
+            { id: 'logs', label: 'Secure Logs', icon: Activity },
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.id ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-              <tab.icon size={18} /> {tab.label}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black transition-all mono font-mono ${activeTab === tab.id ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-50'}`}>
+              <tab.icon size={16} /> {tab.label}
             </button>
           ))}
         </nav>
-        <button onClick={onExit} className="m-4 flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold text-slate-400 hover:text-pink-400 transition"><LogOut size={16} /> Logout</button>
+        <div className="p-6 border-t border-emerald-50">
+          <button onClick={onExit} className="w-full flex items-center gap-3 px-5 py-3 rounded-xl text-[10px] uppercase font-black tracking-widest text-slate-400 hover:text-emerald-700 transition-all mono font-mono">
+            <LogOut size={16} /> Terminate
+          </button>
+        </div>
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="px-12 py-10 bg-[#1e293b] text-white flex justify-between items-end shrink-0">
-          <div>
-            <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.25em] mb-1">Management Console</p>
-            <h1 className="text-5xl font-bold font-serif">{getTitle()}</h1>
-          </div>
-          {activeTab === 'team' && (
-            <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-pink-900/20">
-              <Plus size={16} /> Add Team Member
+        <header className="px-10 py-6 bg-white border-b border-emerald-100 flex justify-between items-center shrink-0">
+          <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tighter mono font-mono">{activeTab}</h1>
+          <div className="flex items-center gap-3">
+            <button onClick={() => refreshData()} className="p-2.5 text-slate-400 hover:text-slate-900 transition-all">
+              <RefreshCcw size={18} className={isProcessing ? 'animate-spin' : ''} />
             </button>
-          )}
+            <button onClick={() => activeTab === 'services' ? openAddService() : setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-800 transition mono font-mono">
+              <Plus size={16} /> Add Entry
+            </button>
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-12 space-y-8 bg-slate-50/50">
-          {activeTab === 'team' && (
-            <div className="space-y-10">
-              <div className="p-6 bg-pink-50/50 border border-pink-100 rounded-[2rem] flex items-center gap-4">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-pink-500 shadow-sm border border-pink-100"><RefreshCcw size={20} className="animate-spin-slow" /></div>
-                <div><h4 className="text-[10px] font-black text-pink-600 uppercase tracking-[0.2em]">Shop Sync Active</h4><p className="text-xs font-medium text-pink-400">All technician calendars are currently synchronized.</p></div>
-              </div>
+        {/* SEARCH & FILTERS */}
+        <div className="px-10 py-4 bg-white border-b border-emerald-50">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+            <input type="text" placeholder="Search protocol index..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-12 pr-6 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-emerald-500/10 transition-all text-xs font-bold mono font-mono" />
+          </div>
+        </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {team.map(member => (
-                  <div key={member.id} className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-500 text-center flex flex-col items-center group relative">
-                    <div className="relative mb-8">
-                      <div className="w-24 h-24 bg-pink-50 rounded-[2.5rem] flex items-center justify-center text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-all duration-500"><User size={40} /></div>
-                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-green-500 rounded-full border-4 border-white flex items-center justify-center text-white"><Check size={14} strokeWidth={4} /></div>
-                    </div>
-                    <h3 className="text-3xl font-bold font-serif text-slate-800 mb-2">{member.name}</h3>
-                    <p className="text-[11px] font-bold text-slate-400 tracking-widest uppercase mb-1">{member.email}</p>
-                    <p className="text-[10px] font-bold text-pink-400 tracking-widest uppercase mb-8 flex items-center gap-2"><Calendar size={12} /> {member.calendar_email}</p>
-                    
-                    <div className="flex gap-2 w-full mt-auto">
-                      <button 
-                        onClick={() => setEditingMember(member)} 
-                        className="flex-1 bg-[#111827] text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-all"
-                      >
-                        Calendar
-                      </button>
-                      <button 
-                        onClick={(e) => handleDeleteMember(member.id, e)} 
-                        disabled={isProcessing}
-                        className="p-4 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+        {/* CONTENT AREA */}
+        <div className="flex-1 overflow-y-auto p-10">
+          {activeTab === 'services' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {currentServicesToDisplay.map(s => (
+                <div key={s.id} className="p-6 bg-white rounded-2xl border border-emerald-100 hover:shadow-md transition-all group">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="px-3 py-1 bg-emerald-50 text-[9px] font-black uppercase tracking-widest text-emerald-600 rounded-lg mono font-mono">{s.category}</span>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEditService(s)} className="p-2 text-slate-400 hover:text-emerald-700"><Edit2 size={16} /></button>
+                      <button onClick={(e) => handleDeleteService(s.id, e)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <h3 className="font-bold text-slate-900 text-lg mb-1 tracking-tight">{s.name}</h3>
+                  <p className="text-emerald-700 font-bold text-sm mono font-mono uppercase">{s.price}</p>
+                </div>
+              ))}
             </div>
           )}
 
-          {activeTab === 'leads' && (
-            <div className="space-y-6">
-              <div className="relative group">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-pink-500" size={20} />
-                <input type="text" placeholder="Search leads..." className="w-full pl-16 pr-6 py-5 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-4 focus:ring-pink-500/5 shadow-sm font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-black tracking-widest">
-                    <tr><th className="px-8 py-6">Lead Name</th><th className="px-8 py-6">Contact</th><th className="px-8 py-6">Service</th><th className="px-8 py-6">Source</th><th className="px-8 py-6">Status</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {filteredLeads.map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50 transition">
-                        <td className="px-8 py-6 font-bold text-slate-800">{l.name}</td>
-                        <td className="px-8 py-6 text-sm text-slate-500">{l.email || l.phone}</td>
-                        <td className="px-8 py-6 text-sm text-slate-500">{l.service}</td>
-                        <td className="px-8 py-6"><span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest">{l.source}</span></td>
-                        <td className="px-8 py-6 text-sm font-bold text-slate-400 uppercase tracking-widest">{l.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {activeTab === 'consultations' && (
+             <div className="bg-white rounded-2xl border border-emerald-100 overflow-hidden shadow-sm">
+               <table className="w-full text-left">
+                 <thead className="bg-[#f8faf9] border-b border-emerald-100 text-[10px] uppercase text-slate-400 font-black tracking-widest mono font-mono">
+                   <tr>
+                     <th className="px-8 py-4">Grower</th>
+                     <th className="px-8 py-4">Env Status</th>
+                     <th className="px-8 py-4">Action</th>
+                     <th className="px-8 py-4">Stamp</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-emerald-50">
+                   {filteredConsultations.map(b => (
+                     <tr key={b.id} className="hover:bg-emerald-50/30 transition-colors">
+                       <td className="px-8 py-4 text-sm font-bold text-slate-900">{b.client_name}</td>
+                       <td className="px-8 py-4 text-xs text-emerald-700 font-bold mono font-mono">{b.temperature}°C / {b.humidity}%</td>
+                       <td className="px-8 py-4 text-xs text-slate-600 font-medium italic">{b.recommended_action}</td>
+                       <td className="px-8 py-4 text-[10px] text-slate-400 mono font-mono">{new Date(b.created_at).toLocaleDateString()}</td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
           )}
 
-          {activeTab === 'bookings' && (
-            <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-black tracking-widest">
-                  <tr><th className="px-8 py-6">Client</th><th className="px-8 py-6">Service</th><th className="px-8 py-6">Date/Time</th><th className="px-8 py-6">Tech</th><th className="px-8 py-6">Status</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {bookings.map(b => (
-                    <tr key={b.id} className="hover:bg-slate-50 transition">
-                      <td className="px-8 py-6 font-bold text-slate-800">{b.first_name}</td>
-                      <td className="px-8 py-6 text-sm text-slate-500 font-bold uppercase tracking-wide">{b.service}</td>
-                      <td className="px-8 py-6 text-sm text-slate-500 font-medium">{b.date} • {b.time}</td>
-                      <td className="px-8 py-6 text-sm text-slate-500 font-bold italic">{b.tech}</td>
-                      <td className="px-8 py-6"><span className="px-4 py-1.5 bg-green-50 text-green-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100/50">{b.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {activeTab === 'cultivators' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {cultivators.map(member => (
+                <div key={member.id} className="bg-white p-8 rounded-2xl border border-emerald-100 flex flex-col items-center text-center">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4">
+                    <User size={28} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">{member.name}</h3>
+                  <p className="text-[10px] font-black uppercase text-emerald-600 mb-1 mono font-mono">{member.role}</p>
+                  <p className="text-xs text-slate-400 mb-6">{member.email}</p>
+                  <button onClick={() => handleDeleteMember(member.id)} className="text-[10px] font-black text-red-400 hover:text-red-600 uppercase tracking-widest mono font-mono">Archive Record</button>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </main>
 
-      {/* Availability Editor Modal */}
-      {editingMember && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#111827]/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-10 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <h2 className="text-3xl font-bold font-serif text-slate-800">Edit Availability</h2>
-                <p className="text-sm font-bold text-pink-500 uppercase tracking-widest mt-1">{editingMember.name}'s Weekly Calendar</p>
-              </div>
-              <button onClick={() => setEditingMember(null)} className="p-4 hover:bg-slate-100 rounded-2xl transition"><X size={24} /></button>
+      {/* MODALS */}
+      {isServiceModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/40 backdrop-blur-md">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 animate-in zoom-in duration-200">
+            <h2 className="text-xl font-bold mb-8 uppercase tracking-tighter mono font-mono">{editingService ? 'Calibrate' : 'New'} Protocol</h2>
+            <div className="space-y-6">
+              <input type="text" placeholder="Service Name" className="w-full p-4 bg-slate-50 border border-emerald-50 rounded-xl outline-none font-bold text-sm" value={newService.name} onChange={(e) => setNewService({...newService, name: e.target.value})} />
+              <input type="text" placeholder="Price Data" className="w-full p-4 bg-slate-50 border border-emerald-50 rounded-xl outline-none font-bold text-sm" value={newService.price} onChange={(e) => setNewService({...newService, price: e.target.value})} />
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-10 space-y-4">
-              {Object.keys(editingMember.availability).map((day) => {
-                const dayAvail = (editingMember.availability as any)[day] as DayAvailability;
-                return (
-                  <div key={day} className={`flex items-center gap-6 p-6 rounded-3xl border transition-all ${dayAvail.isOpen ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                    <div className="w-32">
-                      <span className="text-sm font-black text-slate-800 uppercase tracking-widest">{day}</span>
-                    </div>
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <div className={`w-12 h-6 rounded-full relative transition-colors ${dayAvail.isOpen ? 'bg-green-500' : 'bg-slate-300'}`}>
-                        <input 
-                          type="checkbox" 
-                          className="hidden" 
-                          checked={dayAvail.isOpen} 
-                          onChange={(e) => {
-                            const updated = { ...editingMember };
-                            (updated.availability as any)[day].isOpen = e.target.checked;
-                            setEditingMember(updated);
-                          }}
-                        />
-                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${dayAvail.isOpen ? 'left-7' : 'left-1'}`} />
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-widest">{dayAvail.isOpen ? 'Open' : 'Closed'}</span>
-                    </label>
-
-                    {dayAvail.isOpen && (
-                      <div className="flex-1 flex items-center justify-end gap-4 animate-in fade-in slide-in-from-right-2">
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Start</p>
-                          <input 
-                            type="time" 
-                            className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 ring-pink-500"
-                            value={dayAvail.start}
-                            onChange={(e) => {
-                              const updated = { ...editingMember };
-                              (updated.availability as any)[day].start = e.target.value;
-                              setEditingMember(updated);
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">End</p>
-                          <input 
-                            type="time" 
-                            className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 ring-pink-500"
-                            value={dayAvail.end}
-                            onChange={(e) => {
-                              const updated = { ...editingMember };
-                              (updated.availability as any)[day].end = e.target.value;
-                              setEditingMember(updated);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="p-10 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-4">
-              <button onClick={() => setEditingMember(null)} className="px-8 py-4 text-sm font-bold text-slate-500 hover:text-slate-800 transition uppercase tracking-widest">Discard Changes</button>
-              <button onClick={handleSaveAvailability} disabled={isProcessing} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-black transition shadow-xl disabled:opacity-50">
-                {isProcessing ? <RefreshCcw size={18} className="animate-spin" /> : <Save size={18} />}
-                Save Calendar
-              </button>
+            <div className="flex gap-3 mt-10">
+              <button onClick={() => setIsServiceModalOpen(false)} className="flex-1 py-4 text-slate-400 font-bold uppercase text-[10px] tracking-widest mono font-mono">Abort</button>
+              <button onClick={handleSaveService} className="flex-1 py-4 bg-emerald-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest mono font-mono">Sync</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Member Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#111827]/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full overflow-hidden p-10 space-y-8 animate-in zoom-in-95">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-bold font-serif text-slate-800">New Staff</h2>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
-            </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/40 backdrop-blur-md">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10">
+            <h2 className="text-xl font-bold mb-8 uppercase tracking-tighter mono font-mono">New Personnel</h2>
             <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
-                <input type="text" className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-pink-500/10 transition font-bold" value={newMember.name} onChange={(e) => setNewMember({...newMember, name: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Staff Email</label>
-                <input type="email" className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-pink-500/10 transition font-bold" value={newMember.email} onChange={(e) => setNewMember({...newMember, email: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Google Calendar Email (Optional)</label>
-                <input type="email" className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-pink-500/10 transition font-bold" value={newMember.calendar_email} onChange={(e) => setNewMember({...newMember, calendar_email: e.target.value})} />
-              </div>
+              <input type="text" placeholder="Name" className="w-full p-4 bg-slate-50 border border-emerald-50 rounded-xl outline-none font-bold text-sm" value={newMember.name} onChange={(e) => setNewMember({...newMember, name: e.target.value})} />
+              <input type="text" placeholder="Specialization" className="w-full p-4 bg-slate-50 border border-emerald-50 rounded-xl outline-none font-bold text-sm" value={newMember.role} onChange={(e) => setNewMember({...newMember, role: e.target.value})} />
+              <input type="email" placeholder="Secure Email" className="w-full p-4 bg-slate-50 border border-emerald-50 rounded-xl outline-none font-bold text-sm" value={newMember.email} onChange={(e) => setNewMember({...newMember, email: e.target.value})} />
             </div>
-            <button onClick={handleAddMember} disabled={isProcessing} className="w-full bg-pink-600 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.25em] hover:bg-pink-700 transition shadow-xl shadow-pink-200 disabled:opacity-50">
-              {isProcessing ? "Creating Account..." : "Add Technician"}
-            </button>
+            <div className="flex gap-3 mt-10">
+              <button onClick={() => setIsAddModalOpen(false)} className="flex-1 py-4 text-slate-400 font-bold uppercase text-[10px] tracking-widest mono font-mono">Abort</button>
+              <button onClick={handleAddMember} className="flex-1 py-4 bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest mono font-mono">Initialize</button>
+            </div>
           </div>
         </div>
       )}

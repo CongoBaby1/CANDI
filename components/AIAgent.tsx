@@ -1,69 +1,69 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2, ExternalLink } from 'lucide-react';
+import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2, Zap, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 import { 
   startLiveSession, 
   generateChatResponse, 
   base64ToUint8Array, 
   decodeAudioData, 
-  floatToPcm 
+  floatToPcm,
+  FileAttachment
 } from '../services/geminiService';
 import { BUSINESS_INFO } from '../constants';
-import { Technician } from '../types';
+import { Cultivator } from '../types';
 
 interface AIAgentProps {
   onAdminAuth: (phrase: string) => void;
-  onNewBooking: (booking: any) => void;
-  onNewLead: (lead: any) => void;
-  team?: Technician[];
+  onConsultation: (consultation: any) => void;
+  cultivators?: Cultivator[];
 }
 
-const BookingConfirmationModal = ({ booking, onConfirm, onCancel }: { booking: any, onConfirm: () => void, onCancel: () => void }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-    <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
+const ConsultationConfirmationModal = ({ consultation, onConfirm, onCancel }: { consultation: any, onConfirm: () => void, onCancel: () => void }) => (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-md">
+    <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
       <div className="p-10">
         <div className="flex justify-between items-start mb-8">
-          <div className="p-4 bg-green-50 rounded-3xl text-green-500 shadow-sm border border-green-100">
+          <div className="p-4 bg-emerald-50 rounded-3xl text-emerald-600 shadow-sm border border-emerald-100/50">
             <CircleCheck size={32} />
           </div>
           <button onClick={onCancel} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
         </div>
-        <h2 className="text-3xl font-bold mb-4 font-serif text-slate-900">Confirm Booking</h2>
+        <h2 className="text-3xl font-bold mb-4 tracking-tighter text-slate-900">Sync Protocol</h2>
         <div className="bg-slate-50 p-6 rounded-3xl space-y-4 mb-8 text-sm border border-slate-100">
           <div className="grid grid-cols-2 gap-y-6 gap-x-4">
             <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Name</p>
-              <p className="font-bold text-slate-800">{booking.first_name}</p>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Grower</p>
+              <p className="font-bold text-slate-800">{consultation.client_name}</p>
             </div>
             <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Nail tech</p>
-              <p className="font-bold text-slate-800">{booking.tech}</p>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Stage</p>
+              <p className="font-bold text-slate-800">{consultation.stage}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Service</p>
-              <p className="font-bold text-slate-800">{booking.service}</p>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Contact</p>
+              <p className="font-bold text-slate-800">{consultation.contact}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Env Temp</p>
+              <p className="font-bold text-slate-800">{consultation.temperature}°C</p>
+            </div>
+            <div>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Relative Humidity</p>
+              <p className="font-bold text-slate-800">{consultation.humidity}%</p>
             </div>
             <div className="col-span-2">
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Appointment</p>
-              <p className="font-bold text-slate-800">{booking.date} at {booking.time}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Phone</p>
-              <p className="font-bold text-slate-800 truncate">{booking.phone}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1">Email</p>
-              <p className="font-bold text-slate-800 truncate">{booking.email}</p>
+              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Recommended Action</p>
+              <p className="font-bold text-emerald-700">{consultation.recommended_action}</p>
             </div>
           </div>
         </div>
-        <button onClick={onConfirm} className="w-full bg-pink-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-pink-700 transition shadow-xl shadow-pink-100">All Correct</button>
+        <button onClick={onConfirm} className="w-full bg-emerald-800 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-900 transition shadow-xl shadow-emerald-100 mono">Initialize Calibration</button>
       </div>
     </div>
   </div>
 );
 
-const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead, team = [] }) => {
+const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivators = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(true);
   const [messages, setMessages] = useState<any[]>([]);
@@ -71,25 +71,37 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingBooking, setPendingBooking] = useState<any>({});
+  const [pendingConsultation, setPendingConsultation] = useState<any>({});
   const [errorState, setErrorState] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
+  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  
   const nextStartTimeRef = useRef(0);
   const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const userTranscriptionRef = useRef("");
   const modelTranscriptionRef = useRef("");
   const chatHistoryRef = useRef<any[]>([]);
   const isVoiceActiveRef = useRef(true);
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
+  const isSessionLiveRef = useRef(false);
   const isPendingTerminationRef = useRef(false);
-  const isPendingBookingModalRef = useRef(false);
-
-  const teamNames = team.map(t => t.name);
+  const isPendingModalRef = useRef(false);
 
   useEffect(() => { chatHistoryRef.current = messages; }, [messages]);
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isConnecting, isAgentSpeaking]);
 
   const stopAllAudio = useCallback(() => {
     activeSourcesRef.current.forEach(s => { try { s.stop(); } catch {} });
@@ -97,83 +109,134 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
     nextStartTimeRef.current = 0;
   }, []);
 
+  const cleanupAudioNodes = useCallback(() => {
+    isSessionLiveRef.current = false;
+    if (processorNodeRef.current) { 
+      try { processorNodeRef.current.disconnect(); } catch {}
+      processorNodeRef.current = null; 
+    }
+    if (sourceNodeRef.current) { 
+      try { sourceNodeRef.current.disconnect(); } catch {}
+      sourceNodeRef.current = null; 
+    }
+    if (microphoneStreamRef.current) { 
+      microphoneStreamRef.current.getTracks().forEach(track => track.stop()); 
+      microphoneStreamRef.current = null; 
+    }
+  }, []);
+
   const closeSession = useCallback(() => {
     setIsAgentSpeaking(false);
     stopAllAudio();
+    cleanupAudioNodes();
     isPendingTerminationRef.current = false;
-    isPendingBookingModalRef.current = false;
+    isPendingModalRef.current = false;
+    
     if (sessionPromiseRef.current) {
       sessionPromiseRef.current.then(s => { try { s.close(); } catch {} });
       sessionPromiseRef.current = null;
     }
     setIsOpen(false);
-  }, [stopAllAudio]);
+  }, [stopAllAudio, cleanupAudioNodes]);
 
-  const addMessage = (role: 'user' | 'agent', text: string, sources: any[] = []) => {
-    if (!text.trim()) return;
-    const newMessage = { id: Math.random().toString(36), role, text, sources, timestamp: new Date() };
-    setMessages(prev => [...prev, newMessage]);
-
-    const normalized = (t: string) => t.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-    if (normalized(text) === normalized(BUSINESS_INFO.adminPhrase)) {
+  const checkSecretPhrase = useCallback((text: string) => {
+    const normalized = text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+    const secret = BUSINESS_INFO.adminPhrase.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+    if (normalized.includes(secret)) {
       onAdminAuth(BUSINESS_INFO.adminPhrase);
+      closeSession();
     }
+  }, [onAdminAuth, closeSession]);
+
+  const addMessage = useCallback((role: 'user' | 'agent', text: string) => {
+    if (!text.trim()) return;
+    const newMessage = { id: Math.random().toString(36), role, text, timestamp: new Date() };
+    setMessages(prev => [...prev, newMessage]);
+    checkSecretPhrase(text);
+  }, [checkSecretPhrase]);
+
+  const renderMessageText = (text: string) => {
+    return text.split('\n').map((line, i) => {
+      const parts = line.split(/(\*\*.*?\*\*)/g).map((part, j) => 
+        part.startsWith('**') && part.endsWith('**') 
+          ? <strong key={j} className="font-bold text-emerald-800">{part.slice(2, -2)}</strong> 
+          : part
+      );
+      
+      return (
+        <div key={i} className={`min-h-[1.2em] ${line.trim().startsWith('-') ? 'pl-2' : ''}`}>
+          {parts}
+        </div>
+      );
+    });
   };
 
   const startSession = async () => {
     setErrorState(null);
     setIsConnecting(true);
     isPendingTerminationRef.current = false;
-    isPendingBookingModalRef.current = false;
+    isPendingModalRef.current = false;
+    isSessionLiveRef.current = false;
+    cleanupAudioNodes();
     
     try {
       const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
       
       if (!inputAudioContextRef.current) inputAudioContextRef.current = new AudioContext({ sampleRate: 16000 });
       if (!outputAudioContextRef.current) outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      
+      try { await inputAudioContextRef.current.resume(); } catch (e) {}
+      try { await outputAudioContextRef.current.resume(); } catch (e) {}
 
       const sessionPromise = startLiveSession({
         onopen: async () => {
+          setIsConnecting(false);
           try {
             const stream = await streamPromise;
-            const session = await sessionPromise;
-            setIsConnecting(false);
+            if (!sessionPromiseRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+            microphoneStreamRef.current = stream;
             setIsAgentSpeaking(true);
+            isSessionLiveRef.current = true;
+            
             const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
+            sourceNodeRef.current = source;
             const processor = inputAudioContextRef.current!.createScriptProcessor(1024, 1, 1);
+            processorNodeRef.current = processor;
+            
             processor.onaudioprocess = (e) => {
-              if (!isVoiceActiveRef.current) return;
-              const pcmBlob = floatToPcm(e.inputBuffer.getChannelData(0));
-              session.sendRealtimeInput({ media: pcmBlob });
+              if (!isSessionLiveRef.current || !isVoiceActiveRef.current) return;
+              try {
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcmBlob = floatToPcm(inputData);
+                sessionPromise.then((session) => {
+                  if (!isSessionLiveRef.current) return;
+                  try { session.sendRealtimeInput({ audio: pcmBlob }); } catch (err) { }
+                });
+              } catch (err) { isSessionLiveRef.current = false; }
             };
             source.connect(processor);
             processor.connect(inputAudioContextRef.current!.destination);
             
-            session.sendRealtimeInput({ 
-              text: "CONVERSATION_START: Please state your official opening statement exactly as defined in your instructions." 
+            sessionPromise.then((session) => {
+              try { session.sendRealtimeInput({ text: "SYSTEM_START" }); } catch (e) { }
             });
           } catch (micErr) {
-            setErrorState("Microphone access denied.");
+            setErrorState("Hardware link denied.");
             setIsConnecting(false);
+            cleanupAudioNodes();
           }
         },
         onmessage: async (msg: any) => {
           if (msg.toolCall) {
             for (const fc of msg.toolCall.functionCalls) {
-              if (fc.name === "requestBookingConfirmation") {
-                setPendingBooking({ ...fc.args, toolCallId: fc.id });
-                if (activeSourcesRef.current.size === 0) {
-                  setShowConfirmModal(true);
-                  setIsAgentSpeaking(false);
-                } else {
-                  isPendingBookingModalRef.current = true;
-                }
+              if (fc.name === "requestConsultationConfirmation") {
+                setPendingConsultation({ ...fc.args, toolCallId: fc.id });
+                stopAllAudio();
+                setShowConfirmModal(true); 
+                setIsAgentSpeaking(false); 
               } else if (fc.name === "terminateSession") {
-                if (activeSourcesRef.current.size === 0) {
-                  closeSession();
-                } else {
-                  isPendingTerminationRef.current = true;
-                }
+                isPendingTerminationRef.current = true;
+                if (activeSourcesRef.current.size === 0) setTimeout(closeSession, 1000);
               }
             }
           }
@@ -185,201 +248,280 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onNewBooking, onNewLead,
             const source = outputAudioContextRef.current.createBufferSource();
             source.buffer = buffer;
             source.connect(outputAudioContextRef.current.destination);
-            
             source.addEventListener('ended', () => { 
               activeSourcesRef.current.delete(source);
-              
-              if (isPendingBookingModalRef.current && activeSourcesRef.current.size === 0) {
-                isPendingBookingModalRef.current = false;
-                setShowConfirmModal(true);
-                setIsAgentSpeaking(false);
+              if (isPendingModalRef.current && activeSourcesRef.current.size === 0) {
+                isPendingModalRef.current = false; setShowConfirmModal(true); setIsAgentSpeaking(false);
               }
-
-              if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) {
-                setTimeout(closeSession, 200);
-              }
+              if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) setTimeout(closeSession, 200);
             });
-            
             source.start(nextStartTimeRef.current);
             nextStartTimeRef.current += buffer.duration;
             activeSourcesRef.current.add(source);
           }
 
           if (msg.serverContent?.interrupted) stopAllAudio();
+          if (msg.serverContent?.inputTranscription) {
+            userTranscriptionRef.current += msg.serverContent.inputTranscription.text;
+            checkSecretPhrase(userTranscriptionRef.current);
+          }
           if (msg.serverContent?.outputTranscription) modelTranscriptionRef.current += msg.serverContent.outputTranscription.text;
-          else if (msg.serverContent?.inputTranscription) userTranscriptionRef.current += msg.serverContent.inputTranscription.text;
 
           if (msg.serverContent?.turnComplete) {
             if (userTranscriptionRef.current) { addMessage('user', userTranscriptionRef.current); userTranscriptionRef.current = ""; }
-            if (modelTranscriptionRef.current) {
-              const text = modelTranscriptionRef.current;
-              addMessage('agent', text);
-              modelTranscriptionRef.current = "";
-            }
+            if (modelTranscriptionRef.current) { addMessage('agent', modelTranscriptionRef.current); modelTranscriptionRef.current = ""; }
           }
         },
-        onerror: (e: any) => { 
-          setErrorState("AI Service Unavailable. Please check your connection.");
-          setIsConnecting(false);
+        onerror: (err: any) => { 
+            setErrorState("Consultant offline."); 
+            setIsConnecting(false); 
+            cleanupAudioNodes(); 
         },
         onclose: () => { 
-          setIsConnecting(false); 
+            isSessionLiveRef.current = false; 
+            setIsConnecting(false); 
+            cleanupAudioNodes(); 
         }
-      }, teamNames);
+      });
+      
       sessionPromiseRef.current = sessionPromise;
     } catch (err) {
-      setErrorState("Connection failed.");
+      setErrorState("Uplink failed.");
       setIsConnecting(false);
+      cleanupAudioNodes();
     }
   };
 
-  const toggleOpen = () => {
-    if (isOpen) { closeSession(); return; }
-    setIsOpen(true);
-    setIsVoiceMode(true);
-    startSession();
+  const toggleOpen = () => { 
+    if (isOpen) {
+      closeSession(); 
+    } else { 
+      // Reset session state for a fresh start
+      setMessages([]);
+      chatHistoryRef.current = [];
+      userTranscriptionRef.current = "";
+      modelTranscriptionRef.current = "";
+      setErrorState(null);
+      setPendingFiles([]);
+      
+      setIsOpen(true); 
+      setIsVoiceMode(true); 
+      startSession(); 
+    } 
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newAttachments: FileAttachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+
+      const promise = new Promise<void>((resolve) => {
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          newAttachments.push({
+            name: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            data: base64
+          });
+          resolve();
+        };
+      });
+
+      reader.readAsDataURL(file);
+      await promise;
+    }
+
+    setPendingFiles(prev => [...prev, ...newAttachments]);
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleChatSubmit = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && pendingFiles.length === 0) return;
     const msg = inputText;
+    const attachments = [...pendingFiles];
+    
     setInputText("");
-    addMessage('user', msg);
-    if (isVoiceMode) { setIsVoiceMode(false); stopAllAudio(); }
+    setPendingFiles([]);
+    addMessage('user', msg + (attachments.length > 0 ? ` [Attached: ${attachments.map(f => f.name).join(', ')}]` : ""));
+    
+    if (isVoiceMode) { setIsVoiceMode(false); stopAllAudio(); cleanupAudioNodes(); }
     try {
-      const response = await generateChatResponse(msg, chatHistoryRef.current, teamNames);
-      addMessage('agent', response.text, response.sources);
-    } catch (err) {
-      addMessage('agent', "I'm having a bit of trouble connecting. Try again?");
-    }
+      const response = await generateChatResponse(msg, chatHistoryRef.current, attachments);
+      addMessage('agent', response.text);
+    } catch (err) { addMessage('agent', "Protocol link interrupted."); }
   };
 
   const handleModalConfirm = async () => {
-    onNewBooking(pendingBooking);
+    onConsultation(pendingConsultation);
     setShowConfirmModal(false);
-    
-    if (sessionPromiseRef.current && pendingBooking.toolCallId) {
-      const session = await sessionPromiseRef.current;
-      session.sendToolResponse({
-        functionResponses: [{
-          id: pendingBooking.toolCallId,
-          name: "requestBookingConfirmation",
-          response: { result: "Success. The user clicked 'All Correct'. Now follow POST-CONFIRMATION instructions: say 'Perfect! Your appointment has been successfully booked. Is there anything else I can help you with?'" }
-        }]
+    if (sessionPromiseRef.current && pendingConsultation.toolCallId) {
+      sessionPromiseRef.current.then((session) => {
+        session.sendToolResponse({ functionResponses: [{ id: pendingConsultation.toolCallId, name: "requestConsultationConfirmation", response: { result: "Success: Protocol Authenticated." } }] });
       });
-    } else {
-      addMessage('agent', "Perfect! Your appointment has been successfully booked. Is there anything else I can help you with?");
+    } else { addMessage('agent', "Record updated. Protocol active."); }
+  };
+
+  const handleModalCancel = () => {
+    setShowConfirmModal(false);
+    if (sessionPromiseRef.current && pendingConsultation.toolCallId) {
+      sessionPromiseRef.current.then((session) => {
+        session.sendToolResponse({ functionResponses: [{ id: pendingConsultation.toolCallId, name: "requestConsultationConfirmation", response: { result: "User aborted calibration." } }] });
+      });
     }
   };
 
   return (
     <>
-      <div className="fixed bottom-8 right-8 z-[60]">
-        {isOpen ? (
-          <div className="w-[350px] md:w-[420px] h-[650px] glass rounded-[3rem] shadow-[0_20px_60px_-15px_rgba(219,39,119,0.3)] border border-white/80 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
-            <div className="bg-pink-600 p-8 flex justify-between items-center text-white relative">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/20 shadow-inner">
-                  <User size={24} />
-                </div>
-                <div>
-                  <h3 className="font-bold font-serif text-lg tracking-tight">Candi Nails & Spa:</h3>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
-                    <p className="text-[9px] uppercase font-black tracking-widest opacity-90">{isVoiceMode ? "Voice Agent Active" : "Chat Mode"}</p>
-                  </div>
+      <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-[60] flex flex-col items-end gap-2">
+        {!isOpen && (
+          <div className="bg-white px-4 md:px-5 py-2 md:py-2.5 rounded-2xl rounded-br-sm shadow-xl border border-emerald-100 animate-in slide-in-from-bottom-4 fade-in duration-700 mb-1 relative group cursor-pointer" onClick={toggleOpen}>
+             <p className="mono font-mono font-bold text-emerald-800 text-[10px] md:text-sm whitespace-nowrap pr-1 uppercase tracking-tighter">Initialize Consultant 🟢</p>
+          </div>
+        )}
+        <button 
+          onClick={toggleOpen}
+          className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl relative group ${isOpen ? 'bg-emerald-950 text-white rotate-90' : 'bg-emerald-800 text-white hover:scale-110 hover:shadow-emerald-200'}`}
+        >
+          {isOpen ? <X size={28} /> : <div className="relative"><Mic size={28} className="md:w-8 md:h-8" /><div className="absolute inset-0 bg-emerald-400 blur-xl opacity-0 group-hover:opacity-40 transition-opacity"></div></div>}
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="fixed inset-0 md:inset-auto md:bottom-32 md:right-8 z-[60] w-full md:w-[450px] md:h-[700px] bg-white md:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in md:slide-in-from-bottom-12 duration-500 border border-emerald-50">
+          <div className="p-6 md:p-8 bg-emerald-950 text-white flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-emerald-800 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                {isVoiceMode ? <Mic size={20} className={`md:w-6 md:h-6 ${isAgentSpeaking ? 'animate-pulse' : ''}`} /> : <Sparkles size={20} className="md:w-6 md:h-6" />}
+              </div>
+              <div>
+                <h3 className="font-bold text-base md:text-lg mono font-mono tracking-tighter">THE GREEN GENIE</h3>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${isConnecting ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+                  <span className="text-[8px] md:text-[9px] uppercase tracking-widest text-emerald-400/60 font-bold mono">{isConnecting ? 'Syncing...' : 'Secure Protocol ON'}</span>
                 </div>
               </div>
-              <button onClick={closeSession} className="p-2 hover:bg-white/20 rounded-xl transition-all active:scale-95"><X size={24} /></button>
             </div>
+            <button onClick={closeSession} className="p-2 md:p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-emerald-100/40 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50 scroll-smooth">
-              {messages.length === 0 && !isConnecting && !errorState && (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-                  <Sparkles size={40} className="text-pink-300" />
-                  <p className="text-sm font-medium italic font-serif text-slate-400">"Hey Love. How can I help you?"</p>
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-[#f8faf9] custom-scrollbar">
+            {messages.length === 0 && !isConnecting && (
+              <div className="text-center py-6 md:py-10 space-y-4">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Zap size={28} className="md:w-8 md:h-8" />
                 </div>
-              )}
-              {messages.map(m => (
-                <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2`}>
-                  <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm leading-relaxed ${
-                    m.role === 'user' ? 'bg-slate-900 text-white rounded-br-none shadow-lg' : 'bg-white border border-pink-100/50 text-slate-800 rounded-bl-none shadow-sm'
-                  }`}>
-                    {m.text}
-                  </div>
-                  {m.sources && m.sources.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2 px-2">
-                      {m.sources.map((s: any, idx: number) => (
-                        <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500 hover:border-pink-300 hover:text-pink-500 transition shadow-sm">
-                          <ExternalLink size={10} /> {s.title || 'Source'}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {isConnecting && (
-                <div className="flex flex-col items-center gap-3 py-10">
-                  <Loader2 size={32} className="text-pink-500 animate-spin" />
-                  <p className="text-[10px] text-pink-500 font-black uppercase tracking-[0.3em] animate-pulse">Establishing Link...</p>
-                </div>
-              )}
-              {errorState && (
-                <div className="p-6 bg-red-50 rounded-[2rem] border border-red-100 flex flex-col items-center gap-4 text-center animate-in shake">
-                  <AlertTriangle size={32} className="text-red-500" />
-                  <p className="text-xs text-red-800 font-medium">{errorState}</p>
-                  <button onClick={startSession} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition shadow-lg">
-                    <RefreshCcw size={14} /> Reconnect
-                  </button>
-                </div>
-              )}
-              <div id="messages-end"></div>
-            </div>
-
-            <div className="p-6 bg-white/80 border-t border-pink-50/50 backdrop-blur-md">
-              <div className="flex items-center gap-2 bg-slate-100/80 p-2 rounded-2xl border border-slate-200/50">
-                <button 
-                  onClick={() => {
-                    if (isVoiceMode) { setIsVoiceMode(false); stopAllAudio(); }
-                    else { setIsVoiceMode(true); startSession(); }
-                  }} 
-                  className={`p-4 rounded-xl transition-all duration-300 ${isVoiceMode ? 'bg-pink-600 text-white shadow-lg rotate-0' : 'text-slate-500 hover:bg-slate-200 rotate-12'}`}
-                >
-                  <Mic size={20} />
-                </button>
-                <input 
-                  type="text" 
-                  value={inputText} 
-                  onChange={(e) => setInputText(e.target.value)} 
-                  onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()} 
-                  placeholder="Ask me anything..." 
-                  className="flex-1 bg-transparent text-sm font-medium outline-none px-3" 
-                />
-                <button 
-                  onClick={handleChatSubmit} 
-                  disabled={!inputText.trim()}
-                  className="p-4 bg-slate-900 text-white rounded-xl hover:bg-black transition-all disabled:opacity-30"
-                >
-                  <Send size={20} />
-                </button>
+                <h4 className="text-slate-800 font-bold text-lg md:text-xl tracking-tight">Environmental Status?</h4>
+                <p className="text-slate-400 text-xs max-w-[240px] mx-auto leading-relaxed">Provide current Temperature and Humidity for a precise VPD calibration.</p>
               </div>
+            )}
+            
+            {isConnecting && (
+              <div className="flex flex-col items-center justify-center h-full space-y-4">
+                <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-900/40 mono tracking-[0.2em]">Establishing Neural Link...</p>
+              </div>
+            )}
+
+            {messages.map((m) => (
+              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                <div className={`max-w-[90%] md:max-w-[85%] p-4 md:p-5 rounded-2xl md:rounded-[2rem] text-sm font-medium leading-relaxed ${
+                  m.role === 'user' 
+                    ? 'bg-emerald-900 text-white rounded-tr-none shadow-lg' 
+                    : 'bg-white text-slate-700 rounded-tl-none shadow-sm border border-emerald-100/50'
+                }`}>
+                  {renderMessageText(m.text)}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {errorState && (
+            <div className="px-6 md:px-8 py-3 bg-red-50 border-t border-red-100 flex items-center gap-3 text-red-500 text-[9px] md:text-[10px] font-bold uppercase tracking-wider mono">
+              <AlertTriangle size={14} /> {errorState}
+              <button onClick={startSession} className="ml-auto underline">Attempt Recalibration</button>
+            </div>
+          )}
+
+          <div className="p-4 md:p-6 bg-white border-t border-slate-100 shrink-0">
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3 md:mb-4 animate-in slide-in-from-bottom-2 duration-300">
+                {pendingFiles.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-2.5 py-1 md:px-3 md:py-1.5 rounded-xl group relative">
+                    {file.mimeType.startsWith('image/') ? <ImageIcon size={12} className="text-emerald-600" /> : <FileText size={12} className="text-emerald-600" />}
+                    <span className="text-[9px] md:text-[10px] font-bold text-emerald-800 truncate max-w-[80px] md:max-w-[100px]">{file.name}</span>
+                    <button onClick={() => removePendingFile(idx)} className="p-0.5 hover:bg-emerald-100 rounded-full text-emerald-400 hover:text-emerald-600">
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="relative flex items-center gap-2 md:gap-3">
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                multiple
+                className="hidden"
+                accept="image/*,.pdf,.txt"
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 bg-slate-50 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all border border-slate-100"
+              >
+                <Paperclip size={18} className="md:w-5 md:h-5" />
+              </button>
+              <input 
+                type="text"
+                placeholder={isUploading ? "Uploading status..." : "Message Green Genie..."}
+                value={inputText}
+                disabled={isUploading}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
+                className="flex-1 bg-slate-50 border border-slate-100 rounded-xl md:rounded-2xl px-4 md:px-6 py-3 md:py-4 text-sm outline-none focus:border-emerald-200 transition-all font-medium pr-12 md:pr-14 disabled:opacity-50"
+              />
+              <button 
+                onClick={handleChatSubmit}
+                disabled={(!inputText.trim() && pendingFiles.length === 0) || isUploading}
+                className="absolute right-1.5 md:right-2 p-2 md:p-2.5 bg-emerald-800 text-white rounded-lg md:rounded-xl hover:bg-emerald-900 transition disabled:opacity-50 disabled:grayscale shadow-md"
+              >
+                {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="md:w-4.5 md:h-4.5" />}
+              </button>
+            </div>
+            <div className="mt-3 md:mt-4 flex justify-between items-center px-1">
+               <button 
+                  onClick={() => setIsVoiceMode(!isVoiceMode)}
+                  className={`flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-[0.1em] transition-colors ${isVoiceMode ? 'text-emerald-700' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${isVoiceMode ? 'bg-emerald-700 animate-pulse' : 'bg-slate-300'}`}></div>
+                  {isVoiceMode ? 'Voice Protocol Active' : 'Enable Voice Comms'}
+                </button>
+                <span className="text-[8px] md:text-[9px] text-slate-300 font-bold uppercase tracking-widest mono font-mono">2026.III.AI</span>
             </div>
           </div>
-        ) : (
-          <button 
-            onClick={toggleOpen} 
-            className="group relative w-20 h-20 bg-pink-600 rounded-full shadow-[0_15px_40px_-5px_rgba(219,39,119,0.4)] flex items-center justify-center hover:scale-110 active:scale-90 transition-all duration-500 z-50 overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-tr from-pink-700 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <Sparkles className="text-white relative z-10" size={32} />
-          </button>
-        )}
-      </div>
+        </div>
+      )}
+
       {showConfirmModal && (
-        <BookingConfirmationModal 
-          booking={pendingBooking} 
+        <ConsultationConfirmationModal 
+          consultation={pendingConsultation} 
           onConfirm={handleModalConfirm} 
-          onCancel={() => setShowConfirmModal(false)} 
+          onCancel={handleModalCancel} 
         />
       )}
     </>

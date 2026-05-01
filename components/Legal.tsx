@@ -11,48 +11,48 @@ const Legal: React.FC<LegalProps> = ({ type, onBack }) => {
   const isPrivacy = type === 'privacy';
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
-      <nav className="sticky top-0 w-full z-50 glass border-b border-pink-100/50 flex items-center px-6 md:px-16 py-5">
-        <button onClick={onBack} className="flex items-center gap-2 text-pink-600 font-bold hover:text-pink-700 transition group">
+    <div className="min-h-screen relative overflow-hidden bg-[#f8faf9]">
+      <nav className="sticky top-0 w-full z-50 glass border-b border-emerald-100/50 flex items-center px-6 md:px-16 py-5">
+        <button onClick={onBack} className="flex items-center gap-2 text-emerald-700 font-bold hover:text-emerald-800 transition group">
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-[11px] uppercase tracking-[0.2em]">Back to Home</span>
+          <span className="text-[11px] uppercase tracking-[0.2em] mono">Return to Hub</span>
         </button>
       </nav>
       
       <main className="max-w-4xl mx-auto px-6 py-24">
         <div className="flex flex-col items-center text-center mb-16">
-          <div className="p-4 bg-pink-50 rounded-3xl text-pink-500 mb-6">
+          <div className="p-4 bg-emerald-50 rounded-3xl text-emerald-600 mb-6">
             {isPrivacy ? <Shield size={40} /> : <FileText size={40} />}
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold font-serif text-slate-800 tracking-tight">
-            {isPrivacy ? "Privacy Policy" : "Terms & Conditions"}
+          <h1 className="text-5xl md:text-6xl font-bold text-slate-800 tracking-tighter">
+            {isPrivacy ? "Privacy Protocol" : "Operating Terms"}
           </h1>
-          <p className="text-slate-400 font-medium uppercase tracking-[0.3em] text-[9px] mt-4">Last Updated: January 2026</p>
+          <p className="text-slate-400 font-medium uppercase tracking-[0.3em] text-[9px] mt-4 mono font-mono">Revision: 2026.01.24</p>
         </div>
 
-        <div className="glass p-8 md:p-16 rounded-[4rem] border border-pink-100/50 space-y-12 text-slate-600 leading-relaxed font-medium">
+        <div className="bg-white p-8 md:p-16 rounded-[2.5rem] border border-emerald-100/50 space-y-12 text-slate-600 leading-relaxed font-medium shadow-sm">
           {isPrivacy ? (
             <>
-              <p>Candi Nails & Spa is committed to protecting your privacy. This policy explains how we collect and safeguard your information.</p>
+              <p>The Greenhouse prioritizes data integrity and security within the pharmaceutical cannabis sector. This policy details our handling of cultivation data and user telemetry.</p>
               <section className="space-y-4">
-                <h2 className="text-3xl font-bold font-serif text-slate-800">1. Information Collection</h2>
-                <p>We collect name, phone number, and email for bookings. Voice data processed by our AI agent is used temporarily to fulfill your requests.</p>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">1. Data Capture</h2>
+                <p>We analyze environmental telemetry (VPD, Temperature, RH) for precision calibration. Bio-security protocols ensure your operational data remains isolated and encrypted.</p>
               </section>
               <section className="space-y-4">
-                <h2 className="text-3xl font-bold font-serif text-slate-800">2. Security</h2>
-                <p>We use top-tier encryption to protect your data in our systems. We do not sell or trade your information to third parties.</p>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">2. AI Encryption</h2>
+                <p>Voice and text inputs processed by "The Greenhouse" consultant are encrypted at-rest. We do not transmit proprietary facility data to unauthorized third parties.</p>
               </section>
             </>
           ) : (
             <>
-              <p>These Terms & Conditions govern the use of our website and booking services. By using our site, you agree to these Terms.</p>
+              <p>These Operating Terms govern the use of The Greenhouse AI systems and consulting protocols. By initializing the system, you agree to these standards.</p>
               <section className="space-y-4">
-                <h2 className="text-3xl font-bold font-serif text-slate-800">1. Appointments</h2>
-                <p>Please provide accurate info. 24h notice is required for cancellations. Late arrivals may result in shortened service time.</p>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">1. Consultation Accuracy</h2>
+                <p>Calibration data depends on accurate sensor input. Users are responsible for providing precise LST and room-level metrics to ensure VPD accuracy within the 2026 Schedule III framework.</p>
               </section>
               <section className="space-y-4">
-                <h2 className="text-3xl font-bold font-serif text-slate-800">2. AI Assistant</h2>
-                <p>Our agent is designed to assist with scheduling. By using it, you acknowledge processing of voice and text inputs.</p>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">2. System Integrity</h2>
+                <p>Initialization of the AI agent constitutes acceptance of real-time environmental processing. The Greenhouse is a technical advisory system; final facility decisions remain with the operator.</p>
               </section>
             </>
           )}
