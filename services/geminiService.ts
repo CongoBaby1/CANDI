@@ -120,7 +120,7 @@ export const startLiveSession = (callbacks: any) => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   return ai.live.connect({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     callbacks: {
       ...callbacks,
       onerror: (err: any) => {
@@ -182,7 +182,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       config: { 
         systemInstruction: getSystemInstruction(),
         tools: [

@@ -218,7 +218,13 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
                 const pcmBlob = floatToPcm(inputData);
                 sessionPromise.then((session) => {
                   if (!isSessionLiveRef.current) return;
-                  try { session.sendRealtimeInput({ audio: pcmBlob }); } catch (err) { }
+                  try {
+                    session.sendRealtimeInput({ media: pcmBlob });
+                  } catch (err) {
+                    console.debug("Send error:", err);
+                    isSessionLiveRef.current = false;
+                    cleanupAudioNodes();
+                  }
                 });
               } catch (err) { 
                 console.error("[AIAgent] Audio process error:", err);
@@ -320,6 +326,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
         }
       });
       
+      sessionPromise.catch((err) => {
+        console.error("Connection failed", err);
+        setErrorState("Connection failed");
+        setIsConnecting(false);
+        cleanupAudioNodes();
+      });
       sessionPromiseRef.current = sessionPromise;
     } catch (err: any) {
       console.error("[AIAgent] Initialization error:", err);
