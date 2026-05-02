@@ -174,8 +174,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents,
+      model: 'gemini-1.5-flash',
       config: { 
         systemInstruction: getSystemInstruction(),
         tools: [
@@ -184,6 +183,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
         ],
         toolConfig: { includeServerSideToolInvocations: true }
       },
+      contents,
     });
 
     return {
@@ -192,9 +192,20 @@ export const generateChatResponse = async (message: string, history: any[] = [],
     };
   } catch (error: any) {
     console.error("[GeminiService] Multimodal chat generation failed:", error);
+    
+    // Check for quota error specifically
+    const isQuotaError = error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED");
+    
+    if (isQuotaError) {
+      return {
+        text: "System Quota Exceeded. The 'Green Genie' needs a moment to recharge! 🌿 This usually means your free API key has hit its limit. Please wait 1-2 minutes and try again. If you're on Vercel, check your Google AI Studio dashboard to monitor your usage.",
+        sources: []
+      };
+    }
+
     const errorMessage = error?.message || "Unknown error";
     return {
-      text: `Signal interference: ${errorMessage}. Please check if your VITE_GEMINI_API_KEY is correctly set and the model is accessible.`,
+      text: `Signal interference: ${errorMessage}. Please check your connection or VITE_GEMINI_API_KEY.`,
       sources: []
     };
   }
