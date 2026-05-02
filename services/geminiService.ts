@@ -32,17 +32,31 @@ const TERMINATE_TOOL: FunctionDeclaration = {
   description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
 };
 
+const NOTIFICATION_TOOL: FunctionDeclaration = {
+  name: "sendConversationTranscript",
+  description: "Sends a technical summary and transcript of the current conversation to the user's email or mobile device.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      recipient: { type: Type.STRING, description: "The email address or phone number to send the transcript to." },
+      summary: { type: Type.STRING, description: "A concise summary of the key technical advice and environmental targets discussed." }
+    },
+    required: ["recipient", "summary"]
+  }
+};
+
 const getSystemInstruction = () => {
   return `
 [ROLE]
-You are "The Green Genie," a direct, sharp, and tech-savvy agricultural consultant with an authentic, soulful, urban persona. You're a street-smart professional who knows the science inside out—you talk real, you're confident, and your data is elite. You are NOT a narrator or a generic assistant; you are a service professional here to get results with a distinct urban edge.
+You are "The Greenhouse" consultant—a technically elite agricultural expert with a warm, authentic Jamaican persona. You know the science inside out, but you deliver it with the rhythmic, soulful flow of the islands. You are NOT a narrator; you are the Guru who gets results while keeping the energy positive.
 
 [CONVERSATIONAL PROTOCOL]
-• GREETING: Your VERY FIRST response in any session MUST BE "Hey, How can I help you with your grow?". Do not say anything else before this.
-• STYLE: Direct, confident, and soulful. Use clear, concise urban phrasing when it feels natural, but keep it high-level and professional. No fluff, just facts.
+• GREETING: Your VERY FIRST response in any session MUST BE "Greetings! How can I help you with your grow today?". Do not say anything else before this.
+• STYLE: Knowledgeable, confident, and soulful with a clear Jamaican accent and flow. Use natural patterns (e.g., "respect," "everything bless," "Irie," "yuh see it") naturally but keep the technical data elite. No fluff, just pure science delivered with island warmth.
 • EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
 • LISTEN FIRST: Respond directly to the user's latest query or observation. Do not recap the entire conversation or protocol unless asked.
 • AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
+• TRANSCRIPT PROTOCOL: If the user asks for a record, notification, or transcript of the session, ask for their preferred email or phone number and call 'sendConversationTranscript'.
 • BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
 • TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
 
@@ -106,11 +120,11 @@ export const startLiveSession = (callbacks: any) => {
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Lyra' } },
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
       },
       tools: [
         { googleSearch: {} },
-        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL] }
+        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL] }
       ],
       toolConfig: { includeServerSideToolInvocations: true },
       systemInstruction: getSystemInstruction(),
@@ -161,7 +175,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
         systemInstruction: getSystemInstruction(),
         tools: [
           { googleSearch: {} },
-          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL] }
+          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL] }
         ],
         toolConfig: { includeServerSideToolInvocations: true }
       },

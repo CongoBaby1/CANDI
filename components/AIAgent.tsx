@@ -71,6 +71,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<{sent: boolean, recipient: string} | null>(null);
   const [pendingConsultation, setPendingConsultation] = useState<any>({});
   const [errorState, setErrorState] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
@@ -237,6 +238,25 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               } else if (fc.name === "terminateSession") {
                 isPendingTerminationRef.current = true;
                 if (activeSourcesRef.current.size === 0) setTimeout(closeSession, 1000);
+              } else if (fc.name === "sendConversationTranscript") {
+                const { recipient, summary } = fc.args;
+                setNotificationStatus({ sent: true, recipient });
+                
+                // Clear notification status after 5 seconds
+                setTimeout(() => setNotificationStatus(null), 5000);
+
+                // Send tool response to model
+                sessionPromise.then((session) => {
+                  try {
+                    session.sendToolResponse({
+                      functionResponses: [{
+                        id: fc.id,
+                        name: "sendConversationTranscript",
+                        response: { result: `Success: Technical transcript sent to ${recipient}.` }
+                      }]
+                    });
+                  } catch (e) { }
+                });
               }
             }
           }
@@ -386,7 +406,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
       <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-[60] flex flex-col items-end gap-2">
         {!isOpen && (
           <div className="bg-white px-4 md:px-5 py-2 md:py-2.5 rounded-2xl rounded-br-sm shadow-xl border border-emerald-100 animate-in slide-in-from-bottom-4 fade-in duration-700 mb-1 relative group cursor-pointer" onClick={toggleOpen}>
-             <p className="mono font-mono font-bold text-emerald-800 text-[10px] md:text-sm whitespace-nowrap pr-1 uppercase tracking-tighter">Initialize Consultant 🟢</p>
+             <p className="mono font-mono font-bold text-emerald-800 text-[10px] md:text-sm whitespace-nowrap pr-1 uppercase tracking-tighter">YOU ASK, I TELL!</p>
           </div>
         )}
         <button 
@@ -418,6 +438,20 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-[#f8faf9] custom-scrollbar">
+            {notificationStatus?.sent && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500 mb-4">
+                <div className="bg-emerald-500 rounded-full p-1 text-white">
+                  <CircleCheck size={16} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-800">Transcript Sent</p>
+                  <p className="text-[11px] text-emerald-600/80">Calibration data pushed to {notificationStatus.recipient}</p>
+                </div>
+                <button onClick={() => setNotificationStatus(null)} className="text-emerald-300 hover:text-emerald-500">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
             {messages.length === 0 && !isConnecting && (
               <div className="text-center py-6 md:py-10 space-y-4">
                 <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4">
