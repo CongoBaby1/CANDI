@@ -3,17 +3,17 @@ import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai"
 import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const getApiKey = () => {
-  // Try platform-specific environment first (AI Studio), then standard Vite environment
-  // Note: process.env.GEMINI_API_KEY is injected by vite.config.ts define block
-  const key = (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : "") || 
-              (import.meta.env.VITE_GEMINI_API_KEY) || 
-              (typeof process !== 'undefined' ? process.env.API_KEY : "") || 
-              "";
-  
-  if (!key) {
-    console.warn("Gemini API Key is missing. Please ensure your environment variable is named exactly VITE_GEMINI_API_KEY in Vercel.");
+  // Try standard Vite environment variable first (Vercel)
+  if (import.meta.env.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
   }
-  return key;
+  
+  // Fallback to define block / process.env (AI Studio)
+  try {
+    return process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+  } catch (e) {
+    return "";
+  }
 };
 
 const ACTION_TOOL: FunctionDeclaration = {
@@ -115,7 +115,7 @@ export const startLiveSession = (callbacks: any) => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   return ai.live.connect({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-2.0-flash-exp',
     callbacks: {
       ...callbacks,
       onerror: (err: any) => {
