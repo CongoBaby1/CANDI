@@ -3,10 +3,15 @@ import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai"
 import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const getApiKey = () => {
-  // In Vite/React, we use the injected process.env from vite.config.ts
-  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+  // Try platform-specific environment first (AI Studio), then standard Vite environment
+  // Note: process.env.GEMINI_API_KEY is injected by vite.config.ts define block
+  const key = (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : "") || 
+              (import.meta.env.VITE_GEMINI_API_KEY) || 
+              (typeof process !== 'undefined' ? process.env.API_KEY : "") || 
+              "";
+  
   if (!key) {
-    console.warn("Gemini API Key is missing. Live voice agent requires an environment key.");
+    console.warn("Gemini API Key is missing. Please ensure your environment variable is named exactly VITE_GEMINI_API_KEY in Vercel.");
   }
   return key;
 };
