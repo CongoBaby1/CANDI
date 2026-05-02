@@ -3,10 +3,18 @@ import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai"
 import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const getApiKey = () => {
-  // In our Vite setup, process.env is injected by the define block in vite.config.ts
-  // which consolidates GEMINI_API_KEY and VITE_GEMINI_API_KEY
+  // Try to use Vite's default import.meta.env if available
   try {
-    const key = process.env.GEMINI_API_KEY || "";
+    if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+      return import.meta.env.VITE_GEMINI_API_KEY;
+    }
+  } catch (e) {
+    // Ignore error if import.meta is not defined
+  }
+
+  // Fallback to our injected process.env from vite.config.ts
+  try {
+    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
     return key;
   } catch (e) {
     return "";
