@@ -181,7 +181,10 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     cleanupAudioNodes();
     
     try {
-      const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+      const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true }).catch(e => {
+        console.error("[AIAgent] Mic access denied:", e);
+        throw e;
+      });
       
       if (!inputAudioContextRef.current) inputAudioContextRef.current = new AudioContext({ sampleRate: 16000 });
       if (!outputAudioContextRef.current) outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
@@ -191,10 +194,14 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
 
       const sessionPromise = startLiveSession({
         onopen: async () => {
+          console.log("[AIAgent] Session opened");
           setIsConnecting(false);
           try {
             const stream = await streamPromise;
-            if (!sessionPromiseRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+            if (!sessionPromiseRef.current) { 
+              stream.getTracks().forEach(t => t.stop()); 
+              return; 
+            }
             microphoneStreamRef.current = stream;
             setIsAgentSpeaking(true);
             isSessionLiveRef.current = true;
@@ -213,7 +220,10 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
                   if (!isSessionLiveRef.current) return;
                   try { session.sendRealtimeInput({ audio: pcmBlob }); } catch (err) { }
                 });
-              } catch (err) { isSessionLiveRef.current = false; }
+              } catch (err) { 
+                console.error("[AIAgent] Audio process error:", err);
+                isSessionLiveRef.current = false; 
+              }
             };
             source.connect(processor);
             processor.connect(inputAudioContextRef.current!.destination);
@@ -222,6 +232,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               try { session.sendRealtimeInput({ text: "SYSTEM_START" }); } catch (e) { }
             });
           } catch (micErr) {
+            console.error("[AIAgent] Microphone initialization failed:", micErr);
             setErrorState("Hardware link denied.");
             setIsConnecting(false);
             cleanupAudioNodes();
@@ -229,6 +240,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
         },
         onmessage: async (msg: any) => {
           if (msg.toolCall) {
+            console.log("[AIAgent] Tool call received:", msg.toolCall);
             for (const fc of msg.toolCall.functionCalls) {
               if (fc.name === "requestConsultationConfirmation") {
                 setPendingConsultation({ ...fc.args, toolCallId: fc.id });
@@ -241,11 +253,8 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               } else if (fc.name === "sendConversationTranscript") {
                 const { recipient, summary } = fc.args;
                 setNotificationStatus({ sent: true, recipient });
-                
-                // Clear notification status after 5 seconds
                 setTimeout(() => setNotificationStatus(null), 5000);
 
-                // Send tool response to model
                 sessionPromise.then((session) => {
                   try {
                     session.sendToolResponse({
@@ -280,12 +289,17 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             activeSourcesRef.current.add(source);
           }
 
-          if (msg.serverContent?.interrupted) stopAllAudio();
+          if (msg.serverContent?.interrupted) {
+            console.log("[AIAgent] Model interrupted");
+            stopAllAudio();
+          }
           if (msg.serverContent?.inputTranscription) {
             userTranscriptionRef.current += msg.serverContent.inputTranscription.text;
             checkSecretPhrase(userTranscriptionRef.current);
           }
-          if (msg.serverContent?.outputTranscription) modelTranscriptionRef.current += msg.serverContent.outputTranscription.text;
+          if (msg.serverContent?.outputTranscription) {
+            modelTranscriptionRef.current += msg.serverContent.outputTranscription.text;
+          }
 
           if (msg.serverContent?.turnComplete) {
             if (userTranscriptionRef.current) { addMessage('user', userTranscriptionRef.current); userTranscriptionRef.current = ""; }
@@ -293,11 +307,13 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
           }
         },
         onerror: (err: any) => { 
-            setErrorState("Consultant offline."); 
+            console.error("[AIAgent] Session Error:", err);
+            setErrorState(`Consultant offline: ${err.message || 'Connection failed'}`); 
             setIsConnecting(false); 
             cleanupAudioNodes(); 
         },
-        onclose: () => { 
+        onclose: (e: any) => { 
+            console.log("[AIAgent] Session closed:", e);
             isSessionLiveRef.current = false; 
             setIsConnecting(false); 
             cleanupAudioNodes(); 
@@ -305,8 +321,9 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
       });
       
       sessionPromiseRef.current = sessionPromise;
-    } catch (err) {
-      setErrorState("Uplink failed.");
+    } catch (err: any) {
+      console.error("[AIAgent] Initialization error:", err);
+      setErrorState(`Uplink failed: ${err.message || 'Unknown error'}`);
       setIsConnecting(false);
       cleanupAudioNodes();
     }

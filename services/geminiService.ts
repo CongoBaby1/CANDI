@@ -3,9 +3,10 @@ import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai"
 import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const getApiKey = () => {
+  // In Vite/React, we use the injected process.env from vite.config.ts
   const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
   if (!key) {
-    console.warn("GEMINI_API_KEY is not defined. AI features may not function.");
+    console.warn("Gemini API Key is missing. Live voice agent requires an environment key.");
   }
   return key;
 };
@@ -128,6 +129,8 @@ export const startLiveSession = (callbacks: any) => {
       ],
       toolConfig: { includeServerSideToolInvocations: true },
       systemInstruction: getSystemInstruction(),
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
     },
   });
 };
