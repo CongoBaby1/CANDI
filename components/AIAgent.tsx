@@ -539,7 +539,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               </button>
               <input 
                 type="text"
-                placeholder={isUploading ? "Uploading status..." : "Message Green Genie..."}
+                placeholder={isUploading ? "Uploading status..." : "Message The Green Genie..."}
                 value={inputText}
                 disabled={isUploading}
                 onChange={(e) => setInputText(e.target.value)}
