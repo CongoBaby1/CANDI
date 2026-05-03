@@ -119,14 +119,14 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
         } else if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
           const match = part.match(/\[(.*?)\]\((.*?)\)/);
           if (match) {
-            return <a key={j} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline hover:text-emerald-500 font-bold">{match[1]}</a>;
+            return <a key={j} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline hover:text-emerald-500 font-bold break-all">{match[1]}</a>;
           }
         }
         return part;
       });
       
       return (
-        <div key={i} className={`min-h-[1.2em] ${line.trim().startsWith('-') ? 'pl-2' : ''}`}>
+        <div key={i} className={`min-h-[1.2em] break-words whitespace-pre-wrap ${line.trim().startsWith('-') ? 'pl-2' : ''}`}>
           {parts}
         </div>
       );
@@ -335,10 +335,27 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     setPendingFiles([]);
     addMessage('user', msg + (attachments.length > 0 ? ` [Attached: ${attachments.map(f => f.name).join(', ')}]` : ""));
     
-    if (isVoiceMode) { setIsVoiceMode(false); stopAllAudio(); cleanupAudioNodes(); }
+    // If it's ONLY text, switch to text mode. If there's an attachment, stay in voice mode.
+    const isOnlyText = attachments.length === 0 && msg.trim() !== "";
+    if (isOnlyText && isVoiceMode) { 
+      setIsVoiceMode(false); 
+      stopAllAudio(); 
+      cleanupAudioNodes(); 
+    }
+
     try {
+      // Generate the deep analysis via the standard text API (supports PDFs and complex images)
       const response = await generateChatResponse(msg, chatHistoryRef.current, attachments);
       addMessage('agent', response.text);
+      
+      // If voice mode is active and we uploaded a file, command the Live Voice to speak the analysis!
+      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && attachments.length > 0) {
+        sessionPromiseRef.current.then((session) => {
+          try {
+            session.sendRealtimeInput({ text: `SYSTEM_DIRECTIVE: The user just uploaded a document/image. I have analyzed it. Please provide a brief, conversational spoken summary of the following analysis to the user in your persona: \n\n${response.text}` });
+          } catch (e) {}
+        });
+      }
     } catch (err) { addMessage('agent', "Protocol link interrupted."); }
   };
 

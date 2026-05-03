@@ -86,7 +86,7 @@ const App: React.FC = () => {
         <img 
           src="https://res.cloudinary.com/dre9kzcah/image/upload/v1777668972/DB069A47-1524-4356-86F4-BB64FE483EFE_d1w8wk.png" 
           alt="The Green Genie Background"
-          className="w-full h-full object-cover object-center sm:object-[center_30%]"
+          className="w-full h-full object-contain md:object-cover object-center md:object-[center_30%]"
           referrerPolicy="no-referrer"
         />
       </div>
