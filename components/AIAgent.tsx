@@ -332,16 +332,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChatSubmit = async () => {
-    if (!inputText.trim() && pendingFiles.length === 0) return;
-    const msg = inputText;
-    const attachments = [...pendingFiles];
+  const submitMessage = async (msg: string, attachmentsToUse: FileAttachment[] = []) => {
+    if (!msg.trim() && attachmentsToUse.length === 0) return;
     
-    setInputText("");
-    setPendingFiles([]);
-    addMessage('user', msg + (attachments.length > 0 ? ` [Attached: ${attachments.map(f => f.name).join(', ')}]` : ""));
+    addMessage('user', msg + (attachmentsToUse.length > 0 ? ` [Attached: ${attachmentsToUse.map(f => f.name).join(', ')}]` : ""));
     
-    const isOnlyText = attachments.length === 0 && msg.trim() !== "";
+    const isOnlyText = attachmentsToUse.length === 0 && msg.trim() !== "";
 
     // If it's ONLY text and we are in voice mode, send it to the live session
     if (isOnlyText && isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current) {
@@ -353,9 +349,9 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     if (isVoiceMode) isProcessingRef.current = true;
 
     try {
-      const response = await generateChatResponse(msg, chatHistoryRef.current, attachments);
+      const response = await generateChatResponse(msg, chatHistoryRef.current, attachmentsToUse);
       
-      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && attachments.length > 0) {
+      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && attachmentsToUse.length > 0) {
         sessionPromiseRef.current.then((session) => {
           try {
             session.sendRealtimeInput({ text: `SYSTEM_DIRECTIVE: The user just uploaded a document/image. I have analyzed it. Please provide a brief, conversational spoken summary of the following analysis to the user in your persona: \n\n${response.text}` });
@@ -370,6 +366,17 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
       addMessage('agent', "Protocol link interrupted."); 
       isProcessingRef.current = false;
     }
+  };
+
+  const handleChatSubmit = async () => {
+    if (!inputText.trim() && pendingFiles.length === 0) return;
+    const msg = inputText;
+    const attachments = [...pendingFiles];
+    
+    setInputText("");
+    setPendingFiles([]);
+    
+    await submitMessage(msg, attachments);
   };
 
   return (
@@ -437,6 +444,28 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
                 </div>
               </div>
             ))}
+
+            {messages.some(m => m.role === 'agent') && messages.every(m => m.role !== 'user') && !isAgentSpeaking && !isConnecting && (
+              <div className="flex flex-col gap-2 max-w-[90%] md:max-w-[80%] mx-auto pt-2 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                {[
+                  "Whats wrong with my plant?",
+                  "What should my temp and humidity be?",
+                  "When is my plant ready to harvest?",
+                  "How do I dry and cure my flower properly?"
+                ].map((prompt, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => submitMessage(prompt)}
+                    className="text-left px-4 py-3 bg-white border border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50 rounded-xl text-emerald-800 text-xs font-semibold transition-all shadow-sm hover:shadow-md animate-in fade-in slide-in-from-bottom-2"
+                    style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'both' }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+                <p className="text-center text-[10px] md:text-xs text-slate-400 mt-3 font-medium animate-in fade-in delay-500">Or ask a question.</p>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
