@@ -18,50 +18,7 @@ interface AIAgentProps {
   cultivators?: Cultivator[];
 }
 
-const ConsultationConfirmationModal = ({ consultation, onConfirm, onCancel }: { consultation: any, onConfirm: () => void, onCancel: () => void }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-md">
-    <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
-      <div className="p-10">
-        <div className="flex justify-between items-start mb-8">
-          <div className="p-4 bg-emerald-50 rounded-3xl text-emerald-600 shadow-sm border border-emerald-100/50">
-            <CircleCheck size={32} />
-          </div>
-          <button onClick={onCancel} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
-        </div>
-        <h2 className="text-3xl font-bold mb-4 tracking-tighter text-slate-900">Sync Protocol</h2>
-        <div className="bg-slate-50 p-6 rounded-3xl space-y-4 mb-8 text-sm border border-slate-100">
-          <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Grower</p>
-              <p className="font-bold text-slate-800">{consultation.client_name}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Stage</p>
-              <p className="font-bold text-slate-800">{consultation.stage}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Contact</p>
-              <p className="font-bold text-slate-800">{consultation.contact}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Env Temp</p>
-              <p className="font-bold text-slate-800">{consultation.temperature}°C</p>
-            </div>
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Relative Humidity</p>
-              <p className="font-bold text-slate-800">{consultation.humidity}%</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-slate-400 uppercase tracking-widest text-[9px] font-black mb-1 mono">Recommended Action</p>
-              <p className="font-bold text-emerald-700">{consultation.recommended_action}</p>
-            </div>
-          </div>
-        </div>
-        <button onClick={onConfirm} className="w-full bg-emerald-800 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-900 transition shadow-xl shadow-emerald-100 mono">Initialize Calibration</button>
-      </div>
-    </div>
-  </div>
-);
+
 
 const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivators = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,9 +27,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const [inputText, setInputText] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [notificationStatus, setNotificationStatus] = useState<{sent: boolean, recipient: string} | null>(null);
-  const [pendingConsultation, setPendingConsultation] = useState<any>({});
   const [errorState, setErrorState] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -245,36 +199,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
           }
         },
         onmessage: async (msg: any) => {
-          if (msg.toolCall) {
-            console.log("[AIAgent] Tool call received:", msg.toolCall);
-            for (const fc of msg.toolCall.functionCalls) {
-              if (fc.name === "requestConsultationConfirmation") {
-                setPendingConsultation({ ...fc.args, toolCallId: fc.id });
-                stopAllAudio();
-                setShowConfirmModal(true); 
-                setIsAgentSpeaking(false); 
-              } else if (fc.name === "terminateSession") {
-                isPendingTerminationRef.current = true;
-                if (activeSourcesRef.current.size === 0) setTimeout(closeSession, 1000);
-              } else if (fc.name === "sendConversationTranscript") {
-                const { recipient, summary } = fc.args;
-                setNotificationStatus({ sent: true, recipient });
-                setTimeout(() => setNotificationStatus(null), 5000);
-
-                sessionPromise.then((session) => {
-                  try {
-                    session.sendToolResponse({
-                      functionResponses: [{
-                        id: fc.id,
-                        name: "sendConversationTranscript",
-                        response: { result: `Success: Technical transcript sent to ${recipient}.` }
-                      }]
-                    });
-                  } catch (e) { }
-                });
-              }
-            }
-          }
 
           const audioData = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
           if (audioData && outputAudioContextRef.current && isVoiceActiveRef.current) {
@@ -411,25 +335,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     } catch (err) { addMessage('agent', "Protocol link interrupted."); }
   };
 
-  const handleModalConfirm = async () => {
-    onConsultation(pendingConsultation);
-    setShowConfirmModal(false);
-    if (sessionPromiseRef.current && pendingConsultation.toolCallId) {
-      sessionPromiseRef.current.then((session) => {
-        session.sendToolResponse({ functionResponses: [{ id: pendingConsultation.toolCallId, name: "requestConsultationConfirmation", response: { result: "Success: Protocol Authenticated." } }] });
-      });
-    } else { addMessage('agent', "Record updated. Protocol active."); }
-  };
-
-  const handleModalCancel = () => {
-    setShowConfirmModal(false);
-    if (sessionPromiseRef.current && pendingConsultation.toolCallId) {
-      sessionPromiseRef.current.then((session) => {
-        session.sendToolResponse({ functionResponses: [{ id: pendingConsultation.toolCallId, name: "requestConsultationConfirmation", response: { result: "User aborted calibration." } }] });
-      });
-    }
-  };
-
   return (
     <>
       <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-[60] flex flex-col items-end gap-2">
@@ -467,20 +372,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-[#f8faf9] custom-scrollbar">
-            {notificationStatus?.sent && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500 mb-4">
-                <div className="bg-emerald-500 rounded-full p-1 text-white">
-                  <CircleCheck size={16} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-800">Transcript Sent</p>
-                  <p className="text-[11px] text-emerald-600/80">Calibration data pushed to {notificationStatus.recipient}</p>
-                </div>
-                <button onClick={() => setNotificationStatus(null)} className="text-emerald-300 hover:text-emerald-500">
-                  <X size={14} />
-                </button>
-              </div>
-            )}
             {messages.length === 0 && !isConnecting && (
               <div className="text-center py-6 md:py-10 space-y-4">
                 <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -580,13 +471,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
         </div>
       )}
 
-      {showConfirmModal && (
-        <ConsultationConfirmationModal 
-          consultation={pendingConsultation} 
-          onConfirm={handleModalConfirm} 
-          onCancel={handleModalCancel} 
-        />
-      )}
     </>
   );
 };

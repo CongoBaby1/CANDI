@@ -21,40 +21,6 @@ const getApiKey = () => {
   }
 };
 
-const ACTION_TOOL: FunctionDeclaration = {
-  name: "requestConsultationConfirmation",
-  description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      client_name: { type: Type.STRING, description: "Grower's name" },
-      contact: { type: Type.STRING, description: "Email or phone" },
-      stage: { type: Type.STRING, enum: ["Seedling", "Vegetative", "Flower", "Harvest"], description: "Current growth stage" },
-      temperature: { type: Type.NUMBER, description: "Current room temperature in Celsius" },
-      humidity: { type: Type.NUMBER, description: "Current relative humidity percentage" },
-      recommended_action: { type: Type.STRING, description: "Summary of the adjustments required (e.g., 'Increase RH to 75% to hit 0.6 kPa')" }
-    },
-    required: ["client_name", "contact", "stage", "temperature", "humidity", "recommended_action"]
-  }
-};
-
-const TERMINATE_TOOL: FunctionDeclaration = {
-  name: "terminateSession",
-  description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
-};
-
-const NOTIFICATION_TOOL: FunctionDeclaration = {
-  name: "sendConversationTranscript",
-  description: "Sends a technical summary and transcript of the current conversation to the user's email or mobile device.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      recipient: { type: Type.STRING, description: "The email address or phone number to send the transcript to." },
-      summary: { type: Type.STRING, description: "A concise summary of the key technical advice and environmental targets discussed." }
-    },
-    required: ["recipient", "summary"]
-  }
-};
 
 const getSystemInstruction = () => {
   return `
@@ -67,7 +33,6 @@ You are "The Green Genie"—a technically elite agricultural expert with a warm,
 • EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
 • LISTEN FIRST: Respond directly to the user's latest query or observation. Do not recap the entire conversation or protocol unless asked.
 • AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
-• TRANSCRIPT PROTOCOL: If the user asks for a record, notification, or transcript of the session, ask for their preferred email or phone number and call 'sendConversationTranscript'.
 • BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
 • TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
 
@@ -112,7 +77,7 @@ When troubleshooting any plant issue, follow this sequence:
 [OPERATIONAL BEHAVIOR]
 1. Respond to the User: Answer their SPECIFIC question first.
 2. Contextual Check: Mentally note if their current environment is safe, but only alert them if it's drifting into a danger zone.
-3. Summary: Only call 'requestConsultationConfirmation' when the user agrees to lock in a protocol or summary.
+3. Use Google Search: Use your Web Search tool to look up recent data, specific strains, or visual reference information when needed.
 `;
 };
 
@@ -134,8 +99,7 @@ export const startLiveSession = (callbacks: any) => {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
       },
       tools: [
-        { googleSearch: {} },
-        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL] }
+        { googleSearch: {} }
       ],
       toolConfig: { includeServerSideToolInvocations: true },
       systemInstruction: getSystemInstruction(),
@@ -186,8 +150,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
       config: { 
         systemInstruction: getSystemInstruction(),
         tools: [
-          { googleSearch: {} },
-          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL] }
+          { googleSearch: {} }
         ]
       },
       contents,
