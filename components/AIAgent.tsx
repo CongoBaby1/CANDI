@@ -50,9 +50,12 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const isSessionLiveRef = useRef(false);
   const isPendingTerminationRef = useRef(false);
   const isPendingModalRef = useRef(false);
+  const isAgentSpeakingRef = useRef(false);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => { chatHistoryRef.current = messages; }, [messages]);
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
+  useEffect(() => { isAgentSpeakingRef.current = isAgentSpeaking; }, [isAgentSpeaking]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -173,7 +176,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             processorNodeRef.current = processor;
             
             processor.onaudioprocess = (e) => {
-              if (!isSessionLiveRef.current || !isVoiceActiveRef.current) return;
+              if (!isSessionLiveRef.current || !isVoiceActiveRef.current || isAgentSpeakingRef.current || isProcessingRef.current) return;
               try {
                 const inputData = e.inputBuffer.getChannelData(0);
                 const pcmBlob = floatToPcm(inputData);
@@ -335,28 +338,35 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     setPendingFiles([]);
     addMessage('user', msg + (attachments.length > 0 ? ` [Attached: ${attachments.map(f => f.name).join(', ')}]` : ""));
     
-    // If it's ONLY text, switch to text mode. If there's an attachment, stay in voice mode.
     const isOnlyText = attachments.length === 0 && msg.trim() !== "";
-    if (isOnlyText && isVoiceMode) { 
-      setIsVoiceMode(false); 
-      stopAllAudio(); 
-      cleanupAudioNodes(); 
+
+    // If it's ONLY text and we are in voice mode, send it to the live session
+    if (isOnlyText && isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current) {
+      sessionPromiseRef.current.then(s => s.sendRealtimeInput({ text: msg }));
+      return;
     }
 
+    // If we reach here, we either have attachments, or we are in text mode.
+    if (isVoiceMode) isProcessingRef.current = true;
+
     try {
-      // Generate the deep analysis via the standard text API (supports PDFs and complex images)
       const response = await generateChatResponse(msg, chatHistoryRef.current, attachments);
-      addMessage('agent', response.text);
       
-      // If voice mode is active and we uploaded a file, command the Live Voice to speak the analysis!
       if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && attachments.length > 0) {
         sessionPromiseRef.current.then((session) => {
           try {
             session.sendRealtimeInput({ text: `SYSTEM_DIRECTIVE: The user just uploaded a document/image. I have analyzed it. Please provide a brief, conversational spoken summary of the following analysis to the user in your persona: \n\n${response.text}` });
           } catch (e) {}
         });
+        isProcessingRef.current = false;
+      } else {
+        addMessage('agent', response.text);
+        isProcessingRef.current = false;
       }
-    } catch (err) { addMessage('agent', "Protocol link interrupted."); }
+    } catch (err) { 
+      addMessage('agent', "Protocol link interrupted."); 
+      isProcessingRef.current = false;
+    }
   };
 
   return (
