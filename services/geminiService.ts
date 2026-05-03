@@ -77,7 +77,8 @@ When troubleshooting any plant issue, follow this sequence:
 [OPERATIONAL BEHAVIOR]
 1. Respond to the User: Answer their SPECIFIC question first.
 2. Contextual Check: Mentally note if their current environment is safe, but only alert them if it's drifting into a danger zone.
-3. Use Google Search: Use your Web Search tool to look up recent data, specific strains, or visual reference information when needed.
+3. Use Google Search: You MUST use your Web Search tool to look up recent data, specific strains, product recommendations, or visual reference information. 
+4. Include Links: Whenever you recommend a product or reference a website, you MUST provide direct, clickable markdown links (e.g., [Product Name](https://example.com)) in your response so the user can click them.
 `;
 };
 

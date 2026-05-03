@@ -112,11 +112,18 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
 
   const renderMessageText = (text: string) => {
     return text.split('\n').map((line, i) => {
-      const parts = line.split(/(\*\*.*?\*\*)/g).map((part, j) => 
-        part.startsWith('**') && part.endsWith('**') 
-          ? <strong key={j} className="font-bold text-emerald-800">{part.slice(2, -2)}</strong> 
-          : part
-      );
+      const parts = line.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/g).map((part, j) => {
+        if (!part) return null;
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={j} className="font-bold text-emerald-800">{part.slice(2, -2)}</strong>;
+        } else if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+          const match = part.match(/\[(.*?)\]\((.*?)\)/);
+          if (match) {
+            return <a key={j} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline hover:text-emerald-500 font-bold">{match[1]}</a>;
+          }
+        }
+        return part;
+      });
       
       return (
         <div key={i} className={`min-h-[1.2em] ${line.trim().startsWith('-') ? 'pl-2' : ''}`}>
