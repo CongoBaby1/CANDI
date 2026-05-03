@@ -167,7 +167,6 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               return; 
             }
             microphoneStreamRef.current = stream;
-            setIsAgentSpeaking(true);
             isSessionLiveRef.current = true;
             
             const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
@@ -219,11 +218,15 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             source.connect(outputAudioContextRef.current.destination);
             source.addEventListener('ended', () => { 
               activeSourcesRef.current.delete(source);
+              if (activeSourcesRef.current.size === 0) {
+                setIsAgentSpeaking(false);
+              }
               if (isPendingModalRef.current && activeSourcesRef.current.size === 0) {
                 isPendingModalRef.current = false; setShowConfirmModal(true); setIsAgentSpeaking(false);
               }
               if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) setTimeout(closeSession, 200);
             });
+            setIsAgentSpeaking(true);
             source.start(nextStartTimeRef.current);
             nextStartTimeRef.current += buffer.duration;
             activeSourcesRef.current.add(source);
