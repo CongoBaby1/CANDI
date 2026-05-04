@@ -30,8 +30,13 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const [errorState, setErrorState] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const visionIntervalRef = useRef<number | null>(null);
 
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -56,6 +61,55 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   useEffect(() => { chatHistoryRef.current = messages; }, [messages]);
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
   useEffect(() => { isAgentSpeakingRef.current = isAgentSpeaking; }, [isAgentSpeaking]);
+
+  useEffect(() => {
+    if (isCameraActive) {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          cameraStreamRef.current = stream;
+          if (videoRef.current) videoRef.current.srcObject = stream;
+          
+          visionIntervalRef.current = window.setInterval(() => {
+            if (!videoRef.current || !canvasRef.current || !isSessionLiveRef.current || !sessionPromiseRef.current) return;
+            
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d');
+            
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+              const base64Data = dataUrl.split(',')[1];
+              
+              sessionPromiseRef.current.then(s => {
+                try {
+                  s.sendRealtimeInput([{
+                    mimeType: "image/jpeg",
+                    data: base64Data
+                  }]);
+                } catch (e) { console.error("Vision link error", e); }
+              });
+            }
+          }, 1000);
+        })
+        .catch(err => {
+          console.error("Camera access denied", err);
+          setIsCameraActive(false);
+          addMessage('agent', "I couldn't access your camera. Make sure permissions are granted.");
+        });
+    } else {
+      if (visionIntervalRef.current) { clearInterval(visionIntervalRef.current); visionIntervalRef.current = null; }
+      if (cameraStreamRef.current) { cameraStreamRef.current.getTracks().forEach(t => t.stop()); cameraStreamRef.current = null; }
+    }
+    
+    return () => {
+      if (visionIntervalRef.current) clearInterval(visionIntervalRef.current);
+      if (cameraStreamRef.current) cameraStreamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, [isCameraActive, addMessage]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -230,6 +284,26 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             source.start(nextStartTimeRef.current);
             nextStartTimeRef.current += buffer.duration;
             activeSourcesRef.current.add(source);
+          }
+
+          const functionCalls = msg.serverContent?.modelTurn?.parts?.filter((p: any) => p.functionCall);
+          if (functionCalls && functionCalls.length > 0) {
+            for (const call of functionCalls) {
+              if (call.functionCall.name === 'enableCamera') {
+                setIsCameraActive(true);
+                sessionPromise.then(s => {
+                  try {
+                    s.sendRealtimeInput([{
+                      functionResponse: {
+                        name: "enableCamera",
+                        id: call.functionCall.id,
+                        response: { status: "Camera enabled. Video frames are now streaming at 1 FPS." }
+                      }
+                    }]);
+                  } catch (e) {}
+                });
+              }
+            }
           }
 
           if (msg.serverContent?.interrupted) {
@@ -430,6 +504,30 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
               <div className="flex flex-col items-center justify-center h-full space-y-4">
                 <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
                 <p className="text-[10px] font-black uppercase tracking-widest text-emerald-900/40 mono tracking-[0.2em]">Establishing Neural Link...</p>
+              </div>
+            )}
+
+            {isCameraActive && (
+              <div className="mx-0 mb-4 mt-2 overflow-hidden rounded-2xl relative shadow-lg border border-emerald-400 bg-black animate-in fade-in slide-in-from-top-4 duration-500">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-56 object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="absolute top-3 left-3 bg-black/60 text-emerald-400 text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md flex items-center gap-2 mono shadow-xl border border-emerald-400/20">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_#34d399]"></div>
+                  Neural Vision Link
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsCameraActive(false);
+                    if (sessionPromiseRef.current) {
+                      sessionPromiseRef.current.then(s => {
+                        try { s.sendRealtimeInput({ text: "SYSTEM_DIRECTIVE: The user has closed the camera feed." }) } catch(e){}
+                      });
+                    }
+                  }}
+                  className="absolute top-3 right-3 bg-black/50 text-white p-1.5 rounded-lg hover:bg-red-500/80 hover:scale-105 transition-all backdrop-blur-md border border-white/10"
+                >
+                  <X size={18} />
+                </button>
               </div>
             )}
 
