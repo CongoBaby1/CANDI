@@ -2,7 +2,8 @@
   "name": "The Green Genie",
   "description": "Your expert AI agricultural consultant specializing in pharmaceutical-grade cultivation and environmental precision.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ],
   "majorCapabilities": []
 }

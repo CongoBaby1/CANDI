@@ -84,16 +84,16 @@ const App: React.FC = () => {
       {/* Optimized background container for mobile fitting */}
       <div className="fixed inset-0 z-[-1] w-full h-[100dvh] bg-[#064e3b]">
         <img 
-          src="https://i.imgur.com/PB3h0m5.png" 
+          src="https://i.imgur.com/JS8biym.png" 
           alt="The Green Genie Background"
-          className="w-full h-full object-cover object-center md:object-[center_30%]"
+          className="w-full h-full object-cover object-center sm:object-[center_30%]"
           referrerPolicy="no-referrer"
         />
       </div>
-      <Header />
       <main className="min-h-screen">
         {/* Visual landing page with background image and AI agent only */}
       </main>
+      <Header />
       <AIAgent 
         onConsultation={handleConsultation}
         onAdminAuth={handleAdminAuth}
