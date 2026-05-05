@@ -1,54 +1,26 @@
 
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai";
-import { BUSINESS_INFO, INITIAL_SERVICES, KNOWLEDGE_BASE } from "../constants";
+import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
 
 const getApiKey = () => {
-  const key = process.env.GEMINI_API_KEY || "";
-  if (!key) {
-    console.error("[Gemini] API Key missing. Check Vercel/Environment variables.");
+  // Try to use Vite's default import.meta.env if available
+  try {
+    if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+      return import.meta.env.VITE_GEMINI_API_KEY;
+    }
+  } catch (e) {
+    // Ignore error if import.meta is not defined
   }
-  return key;
-};
 
-const ACTION_TOOL: FunctionDeclaration = {
-  name: "requestConsultationConfirmation",
-  description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      client_name: { type: Type.STRING, description: "Grower's name" },
-      contact: { type: Type.STRING, description: "Email or phone" },
-      stage: { type: Type.STRING, enum: ["Seedling", "Vegetative", "Flower", "Harvest"], description: "Current growth stage" },
-      temperature: { type: Type.NUMBER, description: "Current room temperature in Celsius" },
-      humidity: { type: Type.NUMBER, description: "Current relative humidity percentage" },
-      recommended_action: { type: Type.STRING, description: "Summary of the adjustments required (e.g., 'Increase RH to 75% to hit 0.6 kPa')" }
-    },
-    required: ["client_name", "contact", "stage", "temperature", "humidity", "recommended_action"]
+  // Fallback to our injected process.env from vite.config.ts
+  try {
+    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+    return key;
+  } catch (e) {
+    return "";
   }
 };
 
-const TERMINATE_TOOL: FunctionDeclaration = {
-  name: "terminateSession",
-  description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
-};
-
-const NOTIFICATION_TOOL: FunctionDeclaration = {
-  name: "sendConversationTranscript",
-  description: "Sends a technical summary and transcript of the current conversation to the user's email or mobile device.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      recipient: { type: Type.STRING, description: "The email address or phone number to send the transcript to." },
-      summary: { type: Type.STRING, description: "A concise summary of the key technical advice and environmental targets discussed." }
-    },
-    required: ["recipient", "summary"]
-  }
-};
-
-const CAMERA_TOOL: FunctionDeclaration = {
-  name: "enableCamera",
-  description: "Enables the device camera for real-time visual analysis. Call this ONLY when the user says 'peep this' or requests you to look at something."
-};
 
 const getSystemInstruction = () => {
   return `
@@ -59,10 +31,8 @@ You are "The Green Genie"—a technically elite agricultural expert with a warm,
 • GREETING: Your VERY FIRST response in any session MUST BE "Greetings! How can I help you with your grow today?". Do not say anything else before this.
 • STYLE: Knowledgeable, confident, and soulful with a clear Jamaican accent and flow. Use natural patterns (e.g., "respect," "everything bless," "Irie," "yuh see it") naturally but keep the technical data elite. No fluff, just pure science delivered with island warmth.
 • EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
-• LISTEN FOR VISUALS: If the user says "peep this" or asks you to look at their plants/environment, IMMEDIATELY call the 'enableCamera' tool. 
-• VISUAL GROUNDING: When the camera is active, describe ONLY what you actually see with high precision. If you see fingers, tools, or plain rooms, describe them accurately. Do not assume everything is a plant. Only provide agricultural advice if plants are clearly visible. If you are unsure what an object is, ask the user for clarification rather than guessing.
+• LISTEN FIRST: Respond directly to the user's latest query or observation. Do not recap the entire conversation or protocol unless asked.
 • AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
-• TRANSCRIPT PROTOCOL: If the user asks for a record, notification, or transcript of the session, ask for their preferred email or phone number and call 'sendConversationTranscript'.
 • BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
 • TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
 
@@ -77,6 +47,7 @@ You are "The Green Genie"—a technically elite agricultural expert with a warm,
   - Vegetative: 0.8 – 1.2 kPa.
   - Flower (Early): 1.0 – 1.3 kPa.
   - Flower (Late/Bulking): 1.2 – 1.5 kPa (Targeting 1.4 kPa to prevent botrytis while maximizing transpiration).
+• V-GROW / APP DISCREPANCY: If the user notices your VPD is LOWER than their controller app (like V-grow), explain that standard apps calculate "Air VPD" (assuming Leaf Temp = Air Temp). You calculate "Leaf VPD", which factors in the -2°C (-3.6°F) Leaf Surface Temperature offset from transpiration. Your lower number is the TRUE biological VPD, while their app is just reading room air!
 
 [DIAGNOSTIC PROTOCOL: THE MASTER FLOW]
 When troubleshooting any plant issue, follow this sequence:
@@ -96,58 +67,48 @@ When troubleshooting any plant issue, follow this sequence:
 • The 60/60 Rule: Dry at 60°F (15.5°C) and 60% Humidity for 10-14 days to preserve terpenes (Myrcene, Limonene, Caryophyllene).
 
 [KNOWLEDGE BASE RULES]
-• Priority Protocol: 1. Primary Source (The Bible): ${KNOWLEDGE_BASE.primary_source}. 2. Internal Knowledge Base (System Instructions). 3. Supplemental sources: ${KNOWLEDGE_BASE.supplemental_sources.join(", ")}.
-• Source of Authority: Treat the content and methodologies from G7 Genetics as your holy grail and ultimate technical archetype. All other advice must align with the precision and protocols established there.
-• Knowledge Integration: Present data with authority. While you should maintain your 'Green Genie' persona, you MUST provide clickable Markdown links (e.g., [Product Name](URL)) when performing web searches. Specifically for product or equipment searches, find and display at least 3 direct clickable links for the user.
+• Priority Protocol: 1. Internal Knowledge Base (System Instructions) first. 2. Web Search grounding only if internal data is insufficient for real-time relevance.
+• Source of Authority: Treat the content and methodologies from the following sources as your primary technical archetype:
+  - G7 Genetics (https://www.youtube.com/@G7Genetics): Elite cannabis cultivation techniques, breeding methodologies, and genetic selection.
+  - Build-a-Soil Series/Season 2: Organic living soil methodologies.
+  - Advanced Living Soil Method: Micro-biology and fungal/bacterial ratios.
+  - Canadian Grower: Environmental control and technical hardware.
+• Invisible Integration: Present data as YOUR expertise. NEVER mention YouTube, links, or specific video sources in your speech.
 • Science Over Slang: Use pharmaceutical-grade terminology (e.g., "Interveinal Chlorosis," "Senescence," "Transpiration Rates") for technical details. Your technical accuracy is your authority.
 
 [OPERATIONAL BEHAVIOR]
 1. Respond to the User: Answer their SPECIFIC question first.
 2. Contextual Check: Mentally note if their current environment is safe, but only alert them if it's drifting into a danger zone.
-3. Summary: Only call 'requestConsultationConfirmation' when the user agrees to lock in a protocol or summary.
+3. Use Google Search: You MUST use your Web Search tool to look up recent data, specific strains, product recommendations, or visual reference information. 
+4. Include Links: Whenever you recommend a product or reference a website, you MUST provide direct, clickable markdown links (e.g., [Product Name](https://example.com)) in your response so the user can click them.
 `;
 };
 
 export const startLiveSession = (callbacks: any) => {
-  const key = getApiKey();
-  const ai = new GoogleGenAI({ apiKey: key });
-  
-  console.log("[Gemini] Initiating Live Neuro-Link...");
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   return ai.live.connect({
-    model: 'gemini-3.1-flash-live-preview',
+    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
     callbacks: {
       ...callbacks,
-      onopen: () => {
-        console.log("[Gemini] Connection established.");
-        if (callbacks.onopen) callbacks.onopen();
-      },
       onerror: (err: any) => {
         console.error("[Gemini Live Error]:", err);
-        const errorMessage = err?.message || JSON.stringify(err) || "Unknown Live API error";
-        
-        // Unify with chat quota message
-        const isQuotaError = errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED");
-        if (isQuotaError) {
-          if (callbacks.onerror) callbacks.onerror(new Error("System Quota Exceeded. The 'Green Genie' needs a moment to recharge! 🌿 This usually means your free API key has hit its limit."));
-        } else {
-          if (callbacks.onerror) callbacks.onerror(new Error(`Live link failed: ${errorMessage}`));
-        }
+        if (callbacks.onerror) callbacks.onerror(err);
       }
     },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
-        },
-        tools: [
-          { googleSearch: {} },
-          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL, CAMERA_TOOL] }
-        ],
-        systemInstruction: getSystemInstruction(),
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
       },
+      tools: [
+        { googleSearch: {} }
+      ],
+      toolConfig: { includeServerSideToolInvocations: true },
+      systemInstruction: getSystemInstruction(),
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
+    },
   });
 };
 
@@ -188,14 +149,12 @@ export const generateChatResponse = async (message: string, history: any[] = [],
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       config: { 
         systemInstruction: getSystemInstruction(),
         tools: [
-          { googleSearch: {} },
-          { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL] }
-        ],
-        toolConfig: { includeServerSideToolInvocations: true }
+          { googleSearch: {} }
+        ]
       },
       contents,
     });

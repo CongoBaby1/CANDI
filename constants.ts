@@ -23,20 +23,4 @@ export const INITIAL_SERVICES: Service[] = [
   { id: 's8', category: ServiceCategory.CURING, name: 'Moisture Activity Mapping', price: 'Stability' }
 ];
 
-export const KNOWLEDGE_BASE = {
-  primary_source: "G7 Genetics (https://www.youtube.com/@G7Genetics)",
-  supplemental_sources: [
-    "Build-a-Soil Series/Season 2",
-    "Advanced Living Soil Method",
-    "Canadian Grower"
-  ]
-};
-
 export const HERO_IMAGE = "https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&q=80&w=2000";
-
-export const SAMPLE_PROMPTS = [
-  "What's wrong with my plant?",
-  "What should my temperature and humidity be?",
-  "When is my plant ready to harvest?",
-  "How do i dry and cure my flower properly?"
-];
