@@ -1,15 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import AIAgent from './components/AIAgent';
+import CannabisUniversity from './components/CannabisUniversity';
 import { Cultivator, SystemLog } from './types';
 import { db } from './services/databaseService';
 import { Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [cultivators, setCultivators] = useState<Cultivator[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
+  const location = useLocation();
 
   const refreshData = async () => {
     try {
@@ -39,7 +43,7 @@ const App: React.FC = () => {
 
   const addLog = async (action: string, details: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const newLog: SystemLog = {
-      id: `log-${Math.random().toString(36).substr(2, 9)}`,
+      id: `log-${Math.random().toString(36).substring(2, 9)}`,
       timestamp: new Date().toISOString(),
       action,
       details,
@@ -72,9 +76,15 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#f0f4f2]">
-        <Loader2 className="w-12 h-12 text-emerald-700 animate-spin mb-4" />
-        <p className="text-emerald-900/40 font-bold uppercase tracking-widest text-[10px] mono">Initializing Green Genie Environment...</p>
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#064e3b] text-white">
+        <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-6" />
+        <div className="text-center space-y-4">
+          <p className="text-emerald-400/60 font-black uppercase tracking-[0.3em] text-[10px] mono">Initializing Green Genie Environment...</p>
+          <div className="pt-4 border-t border-emerald-500/20">
+            <p className="text-emerald-500 font-bold uppercase tracking-widest text-[9px]">Age Restricted System</p>
+            <p className="text-white/40 text-[11px] font-medium mt-1">You must be 21+ to use this site</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -84,16 +94,26 @@ const App: React.FC = () => {
       {/* Optimized background container for mobile fitting */}
       <div className="fixed inset-0 z-[-1] w-full h-[100dvh] bg-[#064e3b]">
         <img 
-          src="https://i.imgur.com/PB3h0m5.png" 
+          src="https://i.imgur.com/uFwOlEL.png" 
           alt="The Green Genie Background"
-          className="w-full h-full object-cover object-center md:object-[center_30%]"
+          className="w-full h-full object-cover object-center sm:object-[center_30%]"
           referrerPolicy="no-referrer"
         />
+        {/* Overlay for readability on pages with content */}
+        {location.pathname !== '/' && (
+          <div className="absolute inset-0 bg-[#064e3b]/45 backdrop-blur-md" />
+        )}
       </div>
+
       <Header />
-      <main className="min-h-screen">
-        {/* Visual landing page with background image and AI agent only */}
+      
+      <main className="relative z-10">
+        <Routes>
+          <Route path="/" element={<div className="h-screen" />} />
+          <Route path="/cannabis-university" element={<CannabisUniversity />} />
+        </Routes>
       </main>
+
       <AIAgent 
         onConsultation={handleConsultation}
         onAdminAuth={handleAdminAuth}

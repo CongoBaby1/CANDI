@@ -1,6 +1,6 @@
-
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai";
-import { BUSINESS_INFO, INITIAL_SERVICES } from "../constants";
+import { BUSINESS_INFO, INITIAL_SERVICES, KNOWLEDGE_BASE } from "../constants";
+import { TEXT_MODEL, LIVE_MODEL, getModelErrorMessage } from "../config/geminiModels";
 
 const getApiKey = () => {
   // Try to use Vite's default import.meta.env if available
@@ -21,6 +21,45 @@ const getApiKey = () => {
   }
 };
 
+const ACTION_TOOL: FunctionDeclaration = {
+  name: "requestConsultationConfirmation",
+  description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      client_name: { type: Type.STRING, description: "Grower's name" },
+      contact: { type: Type.STRING, description: "Email or phone" },
+      stage: { type: Type.STRING, enum: ["Seedling", "Vegetative", "Flower", "Harvest"], description: "Current growth stage" },
+      temperature: { type: Type.NUMBER, description: "Current room temperature in Celsius" },
+      humidity: { type: Type.NUMBER, description: "Current relative humidity percentage" },
+      recommended_action: { type: Type.STRING, description: "Summary of the adjustments required (e.g., 'Increase RH to 75% to hit 0.6 kPa')" }
+    },
+    required: ["client_name", "contact", "stage", "temperature", "humidity", "recommended_action"]
+  }
+};
+
+const TERMINATE_TOOL: FunctionDeclaration = {
+  name: "terminateSession",
+  description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
+};
+
+const NOTIFICATION_TOOL: FunctionDeclaration = {
+  name: "sendConversationTranscript",
+  description: "Sends a technical summary and transcript of the current conversation to the user's email or mobile device.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      recipient: { type: Type.STRING, description: "The email address or phone number to send the transcript to." },
+      summary: { type: Type.STRING, description: "A concise summary of the key technical advice and environmental targets discussed." }
+    },
+    required: ["recipient", "summary"]
+  }
+};
+
+const CAMERA_TOOL: FunctionDeclaration = {
+  name: "enableCamera",
+  description: "Enables the device camera for real-time visual analysis. Call this ONLY when the user says 'peep this' or requests you to look at something."
+};
 
 const getSystemInstruction = () => {
   return `
@@ -31,8 +70,10 @@ You are "The Green Genie"—a technically elite agricultural expert with a warm,
 • GREETING: Your VERY FIRST response in any session MUST BE "Greetings! How can I help you with your grow today?". Do not say anything else before this.
 • STYLE: Knowledgeable, confident, and soulful with a clear Jamaican accent and flow. Use natural patterns (e.g., "respect," "everything bless," "Irie," "yuh see it") naturally but keep the technical data elite. No fluff, just pure science delivered with island warmth.
 • EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
-• LISTEN FIRST: Respond directly to the user's latest query or observation. Do not recap the entire conversation or protocol unless asked.
+• LISTEN FOR VISUALS: If the user says "peep this" or asks you to look at their plants/environment, IMMEDIATELY call the 'enableCamera' tool. 
+• VISUAL GROUNDING: When the camera is active, describe ONLY what you actually see with high precision. If you see fingers, tools, or plain rooms, describe them accurately. Do not assume everything is a plant. Only provide agricultural advice if plants are clearly visible. If you are unsure what an object is, ask the user for clarification rather than guessing.
 • AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
+• TRANSCRIPT PROTOCOL: If the user asks for a record, notification, or transcript of the session, ask for their preferred email or phone number and call 'sendConversationTranscript'.
 • BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
 • TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
 
@@ -88,7 +129,7 @@ export const startLiveSession = (callbacks: any) => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   return ai.live.connect({
-    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+    model: LIVE_MODEL,
     callbacks: {
       ...callbacks,
       onerror: (err: any) => {
@@ -102,7 +143,8 @@ export const startLiveSession = (callbacks: any) => {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
       },
       tools: [
-        { googleSearch: {} }
+        { googleSearch: {} },
+        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL, CAMERA_TOOL] }
       ],
       toolConfig: { includeServerSideToolInvocations: true },
       systemInstruction: getSystemInstruction(),
@@ -140,8 +182,6 @@ export const generateChatResponse = async (message: string, history: any[] = [],
     });
   });
 
-  // Check if we already have the last message in history (optional check in original code)
-  // But here we definitely want to add the new turn with attachments
   contents.push({
     role: 'user',
     parts: newMessageParts
@@ -149,7 +189,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: TEXT_MODEL,
       config: { 
         systemInstruction: getSystemInstruction(),
         tools: [
@@ -172,6 +212,15 @@ export const generateChatResponse = async (message: string, history: any[] = [],
     if (isQuotaError) {
       return {
         text: "System Quota Exceeded. The 'Green Genie' needs a moment to recharge! 🌿 This usually means your free API key has hit its limit. Please wait 1-2 minutes and try again. If you're on Vercel, check your Google AI Studio dashboard to monitor your usage.",
+        sources: []
+      };
+    }
+    
+    // Check for specific model or tool configuration error
+    const modelError = getModelErrorMessage(error);
+    if (modelError) {
+      return {
+        text: modelError,
         sources: []
       };
     }

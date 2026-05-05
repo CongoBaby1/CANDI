@@ -51,3 +51,26 @@ export interface SystemLog {
   details: string;
   type: 'success' | 'info' | 'warning' | 'error';
 }
+
+export interface Lesson {
+  id: string;
+  category: string;
+  title: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  summary: string;
+  keyPoints: string[];
+  commonMistake: string;
+  quickTip: string;
+  quiz: {
+    question: string;
+    options?: string[];
+    answer: string;
+  };
+}
+
+export interface UniversityCategory {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+}
