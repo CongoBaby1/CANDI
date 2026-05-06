@@ -82,6 +82,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const [isUploading, setIsUploading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -123,7 +124,7 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isConnecting, isAgentSpeaking]);
+  }, [messages, isConnecting, isAgentSpeaking, isThinking]);
 
   const stopAllAudio = useCallback(() => {
     activeSourcesRef.current.forEach(s => { try { s.stop(); } catch {} });
@@ -338,22 +339,40 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
 
     // If we reach here, we either have attachments, or we are in text mode.
     if (isVoiceMode) isProcessingRef.current = true;
+    setIsThinking(true);
+
+    // Auto-clear thinking after 30s as safety net
+    const thinkingTimeout = setTimeout(() => {
+      setIsThinking(false);
+      isProcessingRef.current = false;
+    }, 30000);
 
     try {
       const response = await generateChatResponse(msg, chatHistoryRef.current, attachmentsToUse);
+      clearTimeout(thinkingTimeout);
+      setIsThinking(false);
       
-      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && attachmentsToUse.length > 0) {
+      // Always show the text response as a visible message so user sees something
+      addMessage('agent', response.text);
+      
+      // Send to voice session if available — this uses the natural Kore voice from Gemini
+      const liveSessionAvailable = isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current;
+      
+      if (liveSessionAvailable) {
         const session: any = await sessionPromiseRef.current;
         try {
           session.sendRealtimeInput({ text: `SYSTEM_DIRECTIVE: The user just uploaded a document/image. I have analyzed it. Please provide a brief, conversational spoken summary of the following analysis to the user in your persona: \n\n${response.text}` });
         } catch (e) {}
-        isProcessingRef.current = false;
-      } else {
-        addMessage('agent', response.text);
-        if (attachmentsToUse.length > 0) speak(response.text);
-        isProcessingRef.current = false;
+        // Do NOT use browser speech synthesis — let the Gemini voice handle it
+      } else if (attachmentsToUse.length > 0) {
+        // Fallback: use browser speech only if live session is NOT available
+        speak(response.text);
       }
+      
+      isProcessingRef.current = false;
     } catch (err) { 
+      clearTimeout(thinkingTimeout);
+      setIsThinking(false);
       addMessage('agent', "Protocol link interrupted."); 
       isProcessingRef.current = false;
     }
@@ -775,6 +794,21 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
                 </div>
               </div>
             ))}
+
+            {isThinking && (
+              <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="max-w-[90%] md:max-w-[85%] p-4 md:p-5 rounded-2xl md:rounded-[2rem] bg-white text-slate-700 rounded-tl-none shadow-sm border border-emerald-100/50">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1.5">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700/60 mono">Analyzing...</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showSuggestions && (
               <div className="grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
