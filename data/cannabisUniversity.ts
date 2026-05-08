@@ -624,5 +624,107 @@ export const LESSONS: Lesson[] = [
       options: ['5 minutes', '20 minutes', '2 hours', '10 hours'],
       answer: '2 hours'
     }
+  },
+  {
+    id: '31',
+    category: 'Science',
+    title: 'Major Cannabinoids: THC, CBD, CBG, CBN',
+    level: 'Intermediate',
+    summary: 'Beyond THC and CBD, minor cannabinoids like CBG and CBN offer unique therapeutic properties. Understanding their differences helps you choose the right product for your needs.',
+    keyPoints: [
+      'CBG (Cannabigerol) is the "stem cell" of cannabinoids, the precursor to others.',
+      'CBN (Cannabinol) forms as THC ages and is mildly psychoactive with sedative effects.',
+      'THCV can suppress appetite and is found in some Sativa strains.',
+      'CBC (Cannabichromene) may support mood and brain health.'
+    ],
+    commonMistake: 'Assuming CBN is just "old THC" with no value — it has unique sedative benefits.',
+    quickTip: 'Ask for "minor cannabinoid" profiles to explore CBG for focus or CBN for sleep.',
+    quiz: {
+      question: 'Which cannabinoid is considered the "stem cell" precursor to others?',
+      options: ['THC', 'CBD', 'CBG', 'CBN'],
+      answer: 'CBG'
+    }
+  },
+  {
+    id: '32',
+    category: 'Science',
+    title: 'Common Terpenes and Their Effects',
+    level: 'Intermediate',
+    summary: 'Terpenes are aromatic compounds that give cannabis its distinctive smells and influence the effects of each strain. They work alongside cannabinoids through the "Entourage Effect."',
+    keyPoints: [
+      'Myrcene: Earthy, musky — promotes relaxation and sedation.',
+      'Limonene: Citrus scent — elevates mood and reduces stress.',
+      'Pinene: Pine aroma — supports focus and memory retention.',
+      'Caryophyllene: Spicy, peppery — unique terpene that interacts with CB2 receptors.',
+      'Linalool: Floral, lavender — calming and anti-anxiety.',
+      'Terpinolene: Herbal, smoky — uplifting and creative.'
+    ],
+    commonMistake: 'Thinking terpenes are just for smell — they are active compounds that shape your experience.',
+    quickTip: 'Match the terpene to your desired effect: Myrcene for sleep, Limonene for energy, Pinene for focus.',
+    quiz: {
+      question: 'Which terpene is known for its calming, floral lavender scent?',
+      options: ['Limonene', 'Pinene', 'Linalool', 'Caryophyllene'],
+      answer: 'Linalool'
+    }
+  },
+  {
+    id: '33',
+    category: 'Science',
+    title: 'The Entourage Effect Explained',
+    level: 'Intermediate',
+    summary: 'The Entourage Effect is the synergistic interaction between cannabinoids, terpenes, and other compounds in cannabis. The whole plant creates a more balanced experience than isolated compounds alone.',
+    keyPoints: [
+      'Full-spectrum products include a wider range of compounds.',
+      'Isolates like pure CBD or THC lack the synergistic benefits.',
+      'Terpenes modulate how cannabinoids interact with your receptors.',
+      'The Entourage Effect explains why whole-plant medicine is often preferred.'
+    ],
+    commonMistake: 'Believing pure THC or CBD isolates are always "better" than full-spectrum extracts.',
+    quickTip: 'Choose "Full-Spectrum" or "Broad-Spectrum" products for a more well-rounded effect.',
+    quiz: {
+      question: 'What is the Entourage Effect?',
+      options: ['A music festival effect', 'The synergy of all cannabis compounds working together', 'How loud the smell is', 'The cost of premium flower'],
+      answer: 'The synergy of all cannabis compounds working together'
+    }
+  },
+  {
+    id: '34',
+    category: 'Science',
+    title: 'The Endocannabinoid System',
+    level: 'Intermediate',
+    summary: 'The Endocannabinoid System (ECS) is a biological system in all mammals that regulates mood, sleep, appetite, immune response, and pain. Cannabinoids from cannabis interact with this system.',
+    keyPoints: [
+      'CB1 receptors are mainly in the brain and nervous system.',
+      'CB2 receptors are mainly in the immune system.',
+      'Your body produces endocannabinoids naturally (anandamide, 2-AG).',
+      'Phytocannabinoids (from plants) mimic your body\'s natural compounds.'
+    ],
+    commonMistake: 'Thinking cannabis creates a "fake" high — it actually mimics compounds your body already makes.',
+    quickTip: 'Exercise naturally boosts your endocannabinoid levels — the "runner\'s high" is real!',
+    quiz: {
+      question: 'Where are CB1 receptors primarily located?',
+      options: ['In the liver', 'In the brain and nervous system', 'In the skin', 'In the roots'],
+      answer: 'In the brain and nervous system'
+    }
+  },
+  {
+    id: '35',
+    category: 'Science',
+    title: 'Cannabis Chemovars vs Strains',
+    level: 'Advanced',
+    summary: 'The term "Chemovar" (chemical variety) is replacing "strain" in modern cannabis science. It categorizes cannabis by its chemical profile rather than appearance or lineage.',
+    keyPoints: [
+      'Chemovars are classified by dominant cannabinoids and terpenes.',
+      'Two plants with the same name can have different chemovars.',
+      'Lab testing reveals the true chemovar of any product.',
+      'This system is more accurate than using Indica, Sativa, or Hybrid categories alone.'
+    ],
+    commonMistake: 'Trusting a strain name alone — "Blue Dream" from one grower can be very different from another\'s.',
+    quickTip: 'Always check the lab test results for terpene and cannabinoid percentages, not just the name.',
+    quiz: {
+      question: 'What does "Chemovar" stand for?',
+      options: ['Chemical variant', 'Chemical variety', 'Chemist flower', 'Cheese variety'],
+      answer: 'Chemical variety'
+    }
   }
 ];

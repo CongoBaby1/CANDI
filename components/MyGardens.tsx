@@ -72,6 +72,17 @@ const MyGardens: React.FC = () => {
     refreshData();
   }, []);
 
+  // Refresh plants when selected garden changes
+  useEffect(() => {
+    if (selectedGardenId) {
+      setPlants([...getPlantsByGarden(selectedGardenId)]);
+    } else {
+      setPlants([]);
+    }
+    setSelectedPlantId(null);
+    setActivities([]);
+  }, [selectedGardenId]);
+
   const selectedGarden = gardens.find(g => g.id === selectedGardenId) || null;
   const selectedPlant = plants.find(p => p.id === selectedPlantId) || null;
 
@@ -260,8 +271,8 @@ const MyGardens: React.FC = () => {
 
   return (
     <div className="min-h-screen pt-12 md:pt-20 pb-32 px-4 md:px-8 max-w-7xl mx-auto">
-      {/* Floating Back to Home Button */}
-      <div className="fixed bottom-6 right-4 md:bottom-10 md:right-16 z-[60]">
+      {/* Floating Back to Home Button - left side to avoid mic/buttons overlap */}
+      <div className="fixed bottom-6 left-4 md:bottom-10 md:left-16 z-[60]">
         <button
           onClick={() => navigate('/')}
           className="flex flex-col items-center gap-2 group pointer-events-auto"
@@ -391,12 +402,21 @@ const MyGardens: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAddPlant(true)}
-                  className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-[#064e3b] font-bold rounded-2xl transition-all flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add Plant
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDeleteGarden(selectedGarden.id)}
+                    className="px-4 py-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all flex items-center gap-2"
+                    title="Delete Garden"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowAddPlant(true)}
+                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-[#064e3b] font-bold rounded-2xl transition-all flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Add Plant
+                  </button>
+                </div>
               </div>
               {selectedGarden.lighting && (
                 <p className="text-emerald-100/50 text-sm mb-2"><Sun className="w-4 h-4 inline mr-1" /> {selectedGarden.lighting}</p>
