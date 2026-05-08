@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Link, useLocation } from 'react-router-dom';
-import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2, Zap, Paperclip, FileText, Image as ImageIcon, Volume2, VolumeX, GraduationCap } from 'lucide-react';
+import { User, Mic, Send, X, Sparkles, CircleCheck, AlertTriangle, RefreshCcw, Loader2, Zap, Paperclip, FileText, Image as ImageIcon, Volume2, VolumeX, GraduationCap, Sprout } from 'lucide-react';
 import { 
   startLiveSession, 
   generateChatResponse, 
@@ -672,26 +672,31 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
 
   return (
     <>
-      <div className="fixed bottom-6 right-4 md:bottom-10 md:right-16 z-[60] flex flex-col items-center gap-4 pointer-events-auto">
-        <div className="flex flex-col items-center gap-2">
-          <button 
-            onClick={toggleOpen}
-            className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl relative group ${isOpen ? 'bg-emerald-950 text-white rotate-90' : 'bg-emerald-800 text-white hover:scale-110 hover:shadow-emerald-200'}`}
-          >
-            {isOpen ? <X size={28} /> : <div className="relative"><Mic size={24} className="md:w-8 md:h-8" /><div className="absolute inset-0 bg-emerald-400 blur-xl opacity-0 group-hover:opacity-40 transition-opacity"></div></div>}
-          </button>
-        </div>
+      <div className="fixed bottom-6 md:bottom-10 right-4 md:right-16 z-[60] flex flex-col items-center gap-3 pointer-events-auto">
+        <button 
+          onClick={toggleOpen}
+          className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl relative group ${isOpen ? 'bg-emerald-950 text-white rotate-90' : 'bg-emerald-800 text-white hover:scale-110 hover:shadow-emerald-200'}`}
+        >
+          {isOpen ? <X size={28} /> : <div className="relative"><Mic size={24} className="md:w-8 md:h-8" /><div className="absolute inset-0 bg-emerald-400 blur-xl opacity-0 group-hover:opacity-40 transition-opacity"></div></div>}
+        </button>
 
-        {location.pathname === '/' && (
-          <Link 
-            to="/cannabis-university" 
-            className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl bg-emerald-950/90 text-emerald-400 border border-white/10 hover:border-emerald-500/50 backdrop-blur-xl transition-all shadow-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px]"
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span className="hidden sm:inline">Cannabis University</span>
-            <span className="sm:hidden">University</span>
-          </Link>
-        )}
+        <Link 
+          to="/my-gardens" 
+          className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl bg-emerald-800 text-white border border-emerald-700 hover:border-emerald-500 hover:bg-emerald-700 transition-all shadow-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px]"
+        >
+          <Sprout className="w-4 h-4" />
+          <span className="hidden sm:inline">My Gardens</span>
+          <span className="sm:hidden">Gardens</span>
+        </Link>
+
+        <Link 
+          to="/cannabis-university" 
+          className="flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl bg-emerald-800 text-white border border-emerald-700 hover:border-emerald-500 hover:bg-emerald-700 transition-all shadow-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px]"
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span className="hidden sm:inline">Cannabis University</span>
+          <span className="sm:hidden">University</span>
+        </Link>
       </div>
 
       {isOpen && (

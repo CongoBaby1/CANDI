@@ -5,6 +5,7 @@ import Header from './components/Header';
 import AIAgent from './components/AIAgent';
 import CannabisUniversity from './components/CannabisUniversity';
 import LessonPage from './components/LessonPage';
+import MyGardens from './components/MyGardens';
 import { Cultivator, SystemLog } from './types';
 import { db } from './services/databaseService';
 import { Loader2 } from 'lucide-react';
@@ -118,6 +119,7 @@ const App: React.FC = () => {
           <Route path="/" element={<div className="h-screen" />} />
           <Route path="/cannabis-university" element={<CannabisUniversity />} />
           <Route path="/cannabis-university/lesson/:id" element={<LessonPage />} />
+          <Route path="/my-gardens" element={<MyGardens />} />
         </Routes>
       </main>
 

@@ -1,11 +1,8 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { GraduationCap, Home } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Header: React.FC = () => {
-  const location = useLocation();
-
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-4 md:px-16 py-6 md:py-10 pointer-events-none">
       <Link to="/" className="flex items-center gap-2 cursor-pointer pointer-events-auto group">
