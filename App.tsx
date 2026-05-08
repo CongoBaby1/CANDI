@@ -4,6 +4,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import AIAgent from './components/AIAgent';
 import CannabisUniversity from './components/CannabisUniversity';
+import LessonPage from './components/LessonPage';
 import { Cultivator, SystemLog } from './types';
 import { db } from './services/databaseService';
 import { Loader2 } from 'lucide-react';
@@ -14,6 +15,11 @@ const App: React.FC = () => {
   const [cultivators, setCultivators] = useState<Cultivator[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const location = useLocation();
+
+  // Scroll to top on every route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location.pathname]);
 
   const refreshData = async () => {
     try {
@@ -111,6 +117,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<div className="h-screen" />} />
           <Route path="/cannabis-university" element={<CannabisUniversity />} />
+          <Route path="/cannabis-university/lesson/:id" element={<LessonPage />} />
         </Routes>
       </main>
 

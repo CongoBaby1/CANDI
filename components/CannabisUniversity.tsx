@@ -1,21 +1,16 @@
-
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Leaf, Package, ShoppingCart, Wind, ShieldCheck, 
   Beaker, Sprout, Cookie, Users, HelpCircle, 
-  ChevronRight, BookOpen, Clock, AlertTriangle, 
-  Lightbulb, X, ArrowLeft
+  ChevronRight, BookOpen, Clock, ArrowLeft
 } from 'lucide-react';
 import { UNIVERSITY_CATEGORIES, LESSONS } from '../data/cannabisUniversity';
-import { Lesson } from '../types';
-import ReactMarkdown from 'react-markdown';
 
 const CannabisUniversity: React.FC = () => {
-  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [quizFeedback, setQuizFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
 
   const filteredLessons = LESSONS.filter(lesson => {
     const matchesCategory = !selectedCategory || lesson.category === selectedCategory;
@@ -64,7 +59,12 @@ const CannabisUniversity: React.FC = () => {
         </p>
         <div className="mt-8">
           <button 
-            onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => {
+              // Navigate to the first lesson
+              if (LESSONS.length > 0) {
+                navigate(`/cannabis-university/lesson/${LESSONS[0].id}`);
+              }
+            }}
             className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-[#064e3b] font-bold rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
           >
             Start Learning
@@ -89,7 +89,15 @@ const CannabisUniversity: React.FC = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.05 }}
               viewport={{ once: true }}
-              onClick={() => setSelectedCategory(selectedCategory === category.title ? null : category.title)}
+              onClick={() => {
+                // Find first lesson in this category and navigate to it
+                const firstLesson = LESSONS.find(l => l.category === category.title);
+                if (firstLesson) {
+                  navigate(`/cannabis-university/lesson/${firstLesson.id}`);
+                } else {
+                  setSelectedCategory(selectedCategory === category.title ? null : category.title);
+                }
+              }}
               className={`group p-6 border rounded-3xl transition-all cursor-pointer backdrop-blur-sm ${
                 selectedCategory === category.title
                 ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' 
@@ -137,10 +145,7 @@ const CannabisUniversity: React.FC = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                onClick={() => {
-                  setSelectedLesson(lesson);
-                  setQuizFeedback(null);
-                }}
+                onClick={() => navigate(`/cannabis-university/lesson/${lesson.id}`)}
                 className="flex flex-col bg-white/[0.03] border border-emerald-500/10 rounded-3xl overflow-hidden hover:border-emerald-500/50 transition-all cursor-pointer group hover:bg-white/[0.05]"
               >
                 <div className="p-8">
@@ -192,127 +197,6 @@ const CannabisUniversity: React.FC = () => {
           Cannabis University is for educational purposes only. Cannabis laws vary by location. Always follow local laws, consume responsibly, and consult a qualified professional for medical advice.
         </p>
       </footer>
-
-      {/* Lesson Details Modal */}
-      <AnimatePresence>
-        {selectedLesson && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedLesson(null)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-2xl bg-[#064e3b]/95 backdrop-blur-xl border border-emerald-400/30 rounded-[2.5rem] shadow-2xl overflow-hidden"
-            >
-              <button 
-                onClick={() => setSelectedLesson(null)}
-                className="absolute top-6 right-6 p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors z-20"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <div className="max-h-[85vh] overflow-y-auto custom-scrollbar p-8 md:p-12">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                    {selectedLesson.category}
-                  </span>
-                  <span className="text-emerald-100/40 text-xs font-mono">• {selectedLesson.level} Level</span>
-                </div>
-                
-                <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter mb-6">
-                  {selectedLesson.title}
-                </h2>
-
-                <div className="prose prose-invert max-w-none mb-10">
-                  <p className="text-emerald-100/80 text-lg leading-relaxed mb-8">
-                    {selectedLesson.summary}
-                  </p>
-                  
-                  <div className="space-y-8">
-                    <div>
-                      <h4 className="flex items-center gap-2 text-emerald-400 font-bold mb-4 uppercase tracking-widest text-xs">
-                        <BookOpen className="w-4 h-4" /> Key Points
-                      </h4>
-                      <ul className="grid gap-3">
-                        {selectedLesson.keyPoints.map((point, i) => (
-                          <li key={i} className="flex items-start gap-3 text-emerald-100/70 text-sm">
-                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            {point}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
-                        <h4 className="flex items-center gap-2 text-rose-400 font-bold mb-3 uppercase tracking-widest text-[10px]">
-                          <AlertTriangle className="w-4 h-4" /> Common Mistake
-                        </h4>
-                        <p className="text-rose-100/70 text-sm leading-relaxed">
-                          {selectedLesson.commonMistake}
-                        </p>
-                      </div>
-                      <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                        <h4 className="flex items-center gap-2 text-emerald-400 font-bold mb-3 uppercase tracking-widest text-[10px]">
-                          <Lightbulb className="w-4 h-4" /> Quick Tip
-                        </h4>
-                        <p className="text-emerald-100/70 text-sm leading-relaxed">
-                          {selectedLesson.quickTip}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-10 border-t border-white/5">
-                  <h4 className="flex items-center gap-2 text-white font-bold mb-6 uppercase tracking-widest text-xs">
-                    Mini Quiz
-                  </h4>
-                  <div className="bg-black/20 rounded-2xl p-8 border border-white/5 text-center">
-                    <p className="text-emerald-100 font-medium mb-6">{selectedLesson.quiz.question}</p>
-                    <div className="grid gap-2">
-                       {selectedLesson.quiz.options?.map((opt, i) => (
-                         <button 
-                           key={i}
-                           onClick={() => {
-                             if (opt === selectedLesson.quiz.answer) {
-                               setQuizFeedback({ isCorrect: true, message: "Correct! Legend status." });
-                             } else {
-                               setQuizFeedback({ isCorrect: false, message: "Not quite, but keep learning!" });
-                             }
-                           }}
-                           className={`py-3 px-6 rounded-xl border transition-all font-medium text-sm ${
-                             quizFeedback?.isCorrect && opt === selectedLesson.quiz.answer
-                             ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                             : 'bg-white/5 border-white/10 text-white hover:bg-emerald-500/20 hover:border-emerald-500/40'
-                           }`}
-                         >
-                           {opt}
-                         </button>
-                       ))}
-                    </div>
-                    {quizFeedback && (
-                      <motion.p 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`mt-6 font-bold text-sm ${quizFeedback.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}
-                      >
-                        {quizFeedback.message}
-                      </motion.p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
