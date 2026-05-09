@@ -132,6 +132,54 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     nextStartTimeRef.current = 0;
   }, []);
 
+  const applyJamaicanSpeechPatterns = useCallback((text: string) => {
+    // Apply Jamaican Patois-influenced transformations
+    let result = text;
+    
+    // Common Jamaican speech patterns
+    // Replace "th" with "d" at beginning of words (this -> dis, that -> dat)
+    result = result.replace(/\bth([aeiou])/g, 'd$1');
+    
+    // Replace "th" with "t" at end of words (with -> wit, breath -> bret)
+    result = result.replace(/th\b/g, 't');
+    
+    // Replace "ing" with "in" at end of words (running -> runnin, going -> goin)
+    result = result.replace(/ing\b/g, 'in');
+    
+    // Replace "you" with "yu" (informal)
+    result = result.replace(/\byou\b/g, 'yu');
+    
+    // Replace "your" with "yuh"
+    result = result.replace(/\byour\b/g, 'yuh');
+    
+    // Replace "to" with "tu" (informal)
+    result = result.replace(/\bto\b/g, 'tu');
+    
+    // Replace "the" with "di" (informal)
+    result = result.replace(/\bthe\b/g, 'di');
+    
+    // Replace "I am" with "mi" (I am -> mi)
+    result = result.replace(/\bI am\b/g, 'mi');
+    
+    // Replace "I have" with "mi hav"
+    result = result.replace(/\bI have\b/g, 'mi hav');
+    
+    // Replace "I will" with "mi wi"
+    result = result.replace(/\bI will\b/g, 'mi wi');
+    
+    // Replace "we are" with "wi de"
+    result = result.replace(/\bwe are\b/g, 'wi de');
+    
+    // Add Jamaican interjections occasionally
+    if (Math.random() > 0.7) { // 30% chance to add an interjection
+      const interjections = ['yes mi bredrin', 'respect', 'bless up', 'jah know', 'one love'];
+      const randomInterjection = interjections[Math.floor(Math.random() * interjections.length)];
+      result = `${randomInterjection}, ${result}`;
+    }
+    
+    return result;
+  }, []);
+
   const cleanupAudioNodes = useCallback(() => {
     isSessionLiveRef.current = false;
     if (processorNodeRef.current) { 
@@ -222,24 +270,54 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     if (isMuted) return;
     
     // Clean text for speech (remove markdown)
-    const cleanText = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links
-                          .replace(/[*_#`~>]/g, '') // Remove MD chars
-                          .trim();
-    
+    let cleanText = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links
+                       .replace(/[*_#`~>]/g, '') // Remove MD chars
+                       .trim();
+   
     if (!cleanText) return;
+
+    // Apply Jamaican Patois-influenced speech patterns
+    cleanText = applyJamaicanSpeechPatterns(cleanText);
 
     try {
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      // Note: We don't specify a voice here to remain cross-platform,
-      // but the user can hear the message.
+      
+      // Try to find a voice that works best with the Jamaican persona text
+      const voices = window.speechSynthesis.getVoices();
+      
+      // Preference order: Look for a natural-sounding voice that handles
+      // rhythmic/soulful speech patterns well. On Windows, "Microsoft Mark"
+      // (US) or "Microsoft David" are common, but we prioritize voices that
+      // have a warm, resonant quality fitting the Jamaican persona.
+      let selectedVoice = voices.find(v => 
+        v.name.toLowerCase().includes('mark') && v.lang.startsWith('en')
+      ) || voices.find(v => 
+        v.name.toLowerCase().includes('david') && v.lang.startsWith('en')
+      ) || voices.find(v => 
+        v.name.toLowerCase().includes('hazel') && v.lang.startsWith('en')
+      ) || voices.find(v => 
+        v.name.toLowerCase().includes('zira') && v.lang.startsWith('en')
+      ) || voices.find(v => 
+        v.lang.startsWith('en') && v.localService
+      ) || voices.find(v => 
+        v.lang.startsWith('en')
+      );
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      // Tune pitch and rate for Jamaican speech rhythm
+      utterance.rate = 0.85;       // Slower for Jamaican rhythm and clarity
+      utterance.pitch = 1.2;       // Higher pitch for warmer Jamaican tone
+      utterance.volume = 1.0;
+      
       window.speechSynthesis.cancel(); // Stop current speech
       window.speechSynthesis.speak(utterance);
     } catch (e) {
       console.warn("[AIAgent] Speech synthesis failed:", e);
     }
-  }, [isMuted]);
+  }, [isMuted, applyJamaicanSpeechPatterns]);
 
   const toggleMute = () => {
     if (!isMuted) {
@@ -561,27 +639,35 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             }
           }
 
-          const audioData = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-          if (audioData && outputAudioContextRef.current && isVoiceActiveRef.current) {
-            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContextRef.current.currentTime);
-            const buffer = await decodeAudioData(base64ToUint8Array(audioData), outputAudioContextRef.current, 24000, 1);
-            const source = outputAudioContextRef.current.createBufferSource();
-            source.buffer = buffer;
-            source.connect(outputAudioContextRef.current.destination);
-            source.addEventListener('ended', () => { 
-              activeSourcesRef.current.delete(source);
-              if (activeSourcesRef.current.size === 0) {
-                setIsAgentSpeaking(false);
+          // Scan ALL parts — native audio models can place audio chunks in any part index
+          const parts = msg.serverContent?.modelTurn?.parts ?? [];
+          for (const part of parts) {
+            const audioData = part?.inlineData?.data;
+            if (audioData && outputAudioContextRef.current && isVoiceActiveRef.current) {
+              try {
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContextRef.current.currentTime);
+                const buffer = await decodeAudioData(base64ToUint8Array(audioData), outputAudioContextRef.current, 24000, 1);
+                const source = outputAudioContextRef.current.createBufferSource();
+                source.buffer = buffer;
+                source.connect(outputAudioContextRef.current.destination);
+                source.addEventListener('ended', () => { 
+                  activeSourcesRef.current.delete(source);
+                  if (activeSourcesRef.current.size === 0) {
+                    setIsAgentSpeaking(false);
+                  }
+                  if (isPendingModalRef.current && activeSourcesRef.current.size === 0) {
+                    isPendingModalRef.current = false; setShowConfirmModal(true); setIsAgentSpeaking(false);
+                  }
+                  if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) setTimeout(closeSession, 200);
+                });
+                setIsAgentSpeaking(true);
+                source.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += buffer.duration;
+                activeSourcesRef.current.add(source);
+              } catch (audioErr) {
+                console.warn('[AIAgent] Audio decode error for part:', audioErr);
               }
-              if (isPendingModalRef.current && activeSourcesRef.current.size === 0) {
-                isPendingModalRef.current = false; setShowConfirmModal(true); setIsAgentSpeaking(false);
-              }
-              if (isPendingTerminationRef.current && activeSourcesRef.current.size === 0) setTimeout(closeSession, 200);
-            });
-            setIsAgentSpeaking(true);
-            source.start(nextStartTimeRef.current);
-            nextStartTimeRef.current += buffer.duration;
-            activeSourcesRef.current.add(source);
+            }
           }
 
           if (msg.serverContent?.interrupted) {
