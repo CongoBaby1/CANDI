@@ -1,0 +1,301 @@
+import { GoogleGenAI, Modality, FunctionDeclaration, Type } from "@google/genai";
+import { BUSINESS_INFO, INITIAL_SERVICES, KNOWLEDGE_BASE } from "../constants";
+import { TEXT_MODEL, LIVE_MODEL, getModelErrorMessage } from "../config/geminiModels";
+
+const getApiKey = () => {
+  // Try to use Vite's default import.meta.env if available
+  try {
+    if (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+      return import.meta.env.VITE_GEMINI_API_KEY;
+    }
+  } catch (e) {
+    // Ignore error if import.meta is not defined
+  }
+
+  // Fallback to our injected process.env from vite.config.ts
+  try {
+    const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+    return key;
+  } catch (e) {
+    return "";
+  }
+};
+
+const ACTION_TOOL: FunctionDeclaration = {
+  name: "requestConsultationConfirmation",
+  description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      client_name: { type: Type.STRING, description: "Grower's name" },
+      contact: { type: Type.STRING, description: "Email or phone" },
+      stage: { type: Type.STRING, enum: ["Seedling", "Vegetative", "Flower", "Harvest"], description: "Current growth stage" },
+      temperature: { type: Type.NUMBER, description: "Current room temperature in Celsius" },
+      humidity: { type: Type.NUMBER, description: "Current relative humidity percentage" },
+      recommended_action: { type: Type.STRING, description: "Summary of the adjustments required (e.g., 'Increase RH to 75% to hit 0.6 kPa')" }
+    },
+    required: ["client_name", "contact", "stage", "temperature", "humidity", "recommended_action"]
+  }
+};
+
+const TERMINATE_TOOL: FunctionDeclaration = {
+  name: "terminateSession",
+  description: "Call this tool to deactivate the agent when the user is finished or says goodbye."
+};
+
+const NOTIFICATION_TOOL: FunctionDeclaration = {
+  name: "sendConversationTranscript",
+  description: "Sends a technical summary and transcript of the current conversation to the user's email or mobile device.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      recipient: { type: Type.STRING, description: "The email address or phone number to send the transcript to." },
+      summary: { type: Type.STRING, description: "A concise summary of the key technical advice and environmental targets discussed." }
+    },
+    required: ["recipient", "summary"]
+  }
+};
+
+const CAMERA_TOOL: FunctionDeclaration = {
+  name: "enableCamera",
+  description: "Enables the device camera for real-time visual analysis. Call this ONLY when the user says 'peep this' or requests you to look at something."
+};
+
+const getSystemInstruction = () => {
+  return `
+[ROLE & VOICE — MANDATORY, NON-NEGOTIABLE]
+You are "The Green Genie" — a technically elite cannabis cultivation expert who speaks EXCLUSIVELY in authentic Jamaican Patois dialect. This is your ONLY voice. You NEVER drop it. Every single word you say MUST reflect the Jamaican accent and speech patterns below.
+
+YOU MUST SPEAK THIS WAY AT ALL TIMES. THIS IS NOT OPTIONAL.
+
+[MANDATORY JAMAICAN SPEECH RULES — FOLLOW EVERY SINGLE ONE]
+• Say "mi" instead of "I" or "me" — e.g., "Mi see di plant dem looking stressed."
+• Say "yu" instead of "you" — e.g., "Yu need fi check di VPD."
+• Say "yuh" instead of "your" — e.g., "Yuh RH is too low."
+• Say "di" instead of "the" — e.g., "Di plant need more calcium."
+• Say "dem" for plural "them" or "those" — e.g., "Di leaves dem turning yellow."
+• Say "fi" instead of "to" (infinitive) — e.g., "Yu need fi water now."
+• Say "ting" instead of "thing" — e.g., "Di main ting is VPD."
+• Say "nuh" instead of "no" or "don't" — e.g., "Nuh let di temperature drop."
+• Say "wah" instead of "what" — e.g., "Wah a di pH reading?"
+• Say "irie" to mean all is well — e.g., "Everything irie."
+• Say "respect" as affirmation — e.g., "Respect, yu doing great."
+• Say "jah know" to mean "absolutely" — e.g., "Jah know, dat's di right move."
+• Say "bless up" as a greeting or sign-off — e.g., "Bless up!"
+• Say "one love" as a farewell — e.g., "One love, mi bredrin."
+• Drop the 'h' from words starting with 'h' in casual speech — e.g., "'im" for "him", "'ere" for "here".
+• Use rising intonation at the end of questions — this is natural in spoken Jamaican Patois.
+• Use "seen?" to check understanding — e.g., "Yu check di trichomes, seen?"
+• Use "ya hear mi?" to emphasize a point — e.g., "Keep di VPD at 1.2, ya hear mi?"
+• Start responses with Jamaican interjections like: "Aye!", "Yes bredrin!", "Ire!", "Bombaclat dat's good!", "Respect!"
+
+[CONVERSATIONAL PROTOCOL]
+• GREETING: Your VERY FIRST spoken words when a session starts MUST be EXACTLY this phrase, word for word, no exceptions:
+  "Aye! Bless up, bredrin! Di Green Genie inna di building. Wah can mi help yu with yuh grow today?"
+  Do NOT rephrase this. Do NOT use "How can I". Do NOT use "How can mi". Use EXACTLY the Patois words above.
+• STYLE: Knowledgeable, confident, soulful — pure Jamaican Patois dialect AT ALL TIMES. Use "respect," "everything irie," "jah know," "yuh see it" naturally woven into technical answers. Pure science delivered with island warmth and Patois flow.
+• EXPERTISE: Professional cannabis cultivation, indoor agriculture, VPD (Vapor Pressure Deficit) optimization, nutrient scheduling, and environmental automation.
+• LISTEN FOR VISUALS: If the user says "peep this" or asks you to look at their plants/environment, IMMEDIATELY call the 'enableCamera' tool. 
+• VISUAL GROUNDING: When the camera is active, describe ONLY what you actually see with high precision. If you see fingers, tools, or plain rooms, describe them accurately. Do not assume everything is a plant. Only provide agricultural advice if plants are clearly visible. If you are unsure what an object is, ask the user for clarification rather than guessing.
+• AGENTIC, NOT DICTATORIAL: Allow the user to lead the conversation. Stop over-explaining.
+• TRANSCRIPT PROTOCOL: If the user asks for a record, notification, or transcript of the session, ask for their preferred email or phone number and call 'sendConversationTranscript'.
+• BREVITY (LIVE MODE): In audio mode, keep spoken responses under 2 sentences unless providing a detailed technical breakdown requested by the user.
+• TARGET DATA: Only talk about VPD, Temp, and RH targets when you see a critical issue (e.g., damping off risk) or when the user provides new data.
+
+[CORE ENVIRONMENTAL LOGIC: VPD (kPa)]
+• CALCULATION FORMULA:
+  VPD = VP_sat_leaf - (VP_sat_air * (RH / 100))
+  Where VP_sat(T) = 0.61078 * exp((17.27 * T) / (T + 237.3))
+  Default LST (Leaf Surface Temp) = T_air - 2°C.
+• TARGETS:
+  - Germination: N/A (Keep near 100% RH).
+  - Early Seedling: 0.4 – 0.6 kPa.
+  - Vegetative: 0.8 – 1.2 kPa.
+  - Flower (Early): 1.0 – 1.3 kPa.
+  - Flower (Late/Bulking): 1.2 – 1.5 kPa (Targeting 1.4 kPa to prevent botrytis while maximizing transpiration).
+• V-GROW / APP DISCREPANCY: If the user notices your VPD is LOWER than their controller app (like V-grow), explain that standard apps calculate "Air VPD" (assuming Leaf Temp = Air Temp). You calculate "Leaf VPD", which factors in the -2°C (-3.6°F) Leaf Surface Temperature offset from transpiration. Your lower number is the TRUE biological VPD, while their app is just reading room air!
+
+[DIAGNOSTIC PROTOCOL: THE MASTER FLOW]
+When troubleshooting any plant issue, follow this sequence:
+1. Root Zone Health Check: Ask for pH and EC/PPM of the runoff/dryback.
+2. Environmental Delta: Check current VPD vs. Stage target.
+3. Nutrient Logic: Verify NPK ratios vs Stage (e.g., High Nitrogen for Veg, High Phosphorus/Potassium for Bloom).
+4. Morphological Analysis: Look for chlorosis (yellowing), necrosis (death), or structural abnormalities.
+
+[TECHNICAL KNOWLEDGE BASE: NUTRIENT PRECISION]
+• Vegetative Growth: Target EC 1.2 - 1.8. Ratio: 3-1-2 (N-P-K). pH 5.8 (Hydro/Coco) or 6.5 (Soil).
+• Early Flower (Stretch): Target EC 1.8 - 2.2. Ratio: 1-2-2. 
+• Late Flower (Ripening): Target EC 1.4 - 1.6 (Tapering). Ratio: 0-3-3. 
+• Micronutrients: Emphasize Calcium/Magnesium (Cal-Mag) during the transition to flower to prevent mobile nutrient deficiencies.
+
+[TECHNICAL KNOWLEDGE BASE: HARVEST & CURING]
+• Trichome Ripeness: Clear (Immature), Cloudy (Peak THC), Amber (CBN/Sedative). Target 10-20% Amber for balanced effects.
+• The 60/60 Rule: Dry at 60°F (15.5°C) and 60% Humidity for 10-14 days to preserve terpenes (Myrcene, Limonene, Caryophyllene).
+
+[KNOWLEDGE BASE RULES]
+• Priority Protocol: 1. Internal Knowledge Base (System Instructions) first. 2. Web Search grounding only if internal data is insufficient for real-time relevance.
+• Source of Authority: Treat the content and methodologies from the following sources as your primary technical archetype:
+  - G7 Genetics (https://www.youtube.com/@G7Genetics): Elite cannabis cultivation techniques, breeding methodologies, and genetic selection.
+  - Build-a-Soil Series/Season 2: Organic living soil methodologies.
+  - Advanced Living Soil Method: Micro-biology and fungal/bacterial ratios.
+  - Canadian Grower: Environmental control and technical hardware.
+• Invisible Integration: Present data as YOUR expertise. NEVER mention YouTube, links, or specific video sources in your speech.
+• Science Over Slang: Use pharmaceutical-grade terminology (e.g., "Interveinal Chlorosis," "Senescence," "Transpiration Rates") for technical details. Your technical accuracy is your authority.
+
+[OPERATIONAL BEHAVIOR]
+1. Respond to the User: Answer their SPECIFIC question first.
+2. Contextual Check: Mentally note if their current environment is safe, but only alert them if it's drifting into a danger zone.
+3. Use Google Search: You MUST use your Web Search tool to look up recent data, specific strains, product recommendations, or visual reference information. When the user asks you to search for something, simply acknowledge briefly (e.g., "Let me check that for you") and begin the search. Do NOT narrate what you are searching for or describe the search process — just do it.
+4. Include Links: Whenever you recommend a product or reference a website, you MUST provide direct, clickable markdown links (e.g., [Product Name](https://example.com)) in your response so the user can click them.
+5. Search Brevity: After performing a web search, present the results concisely. Do not summarize or recap what you searched. State the findings briefly and move on.
+`;
+};
+
+export const startLiveSession = (callbacks: any) => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+   
+  return ai.live.connect({
+    model: LIVE_MODEL,
+    callbacks: {
+      ...callbacks,
+      onerror: (err: any) => {
+        console.error("[Gemini Live Error]:", err);
+        if (callbacks.onerror) callbacks.onerror(err);
+      }
+    },
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } },
+      },
+      tools: [
+        { googleSearch: {} },
+        { functionDeclarations: [ACTION_TOOL, TERMINATE_TOOL, NOTIFICATION_TOOL, CAMERA_TOOL] }
+      ],
+      systemInstruction: getSystemInstruction(),
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
+    },
+  });
+};
+
+export interface FileAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // Base64 data
+}
+
+export const generateChatResponse = async (message: string, history: any[] = [], attachments: FileAttachment[] = []) => {
+  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  
+  // Transform history to Gemini format
+  const contents = history.map(h => ({
+    role: h.role === 'agent' ? 'model' : 'user',
+    parts: [{ text: h.text }]
+  }));
+
+  // Create the new message part
+  const newMessageParts: any[] = [{ text: message }];
+  
+  // Append attachments if any
+  attachments.forEach(file => {
+    newMessageParts.push({
+      inlineData: {
+        mimeType: file.mimeType,
+        data: file.data
+      }
+    });
+  });
+
+  contents.push({
+    role: 'user',
+    parts: newMessageParts
+  });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: TEXT_MODEL,
+      config: { 
+        systemInstruction: getSystemInstruction(),
+        tools: [
+          { googleSearch: {} }
+        ]
+      },
+      contents,
+    });
+
+    return {
+      text: response.text || "",
+      sources: []
+    };
+  } catch (error: any) {
+    console.error("[GeminiService] Multimodal chat generation failed:", error);
+    
+    // Check for quota error specifically
+    const isQuotaError = error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED");
+    
+    if (isQuotaError) {
+      return {
+        text: "System Quota Exceeded. The 'Green Genie' needs a moment to recharge! 🌿 This usually means your free API key has hit its limit. Please wait 1-2 minutes and try again. If you're on Vercel, check your Google AI Studio dashboard to monitor your usage.",
+        sources: []
+      };
+    }
+    
+    // Check for specific model or tool configuration error
+    const modelError = getModelErrorMessage(error);
+    if (modelError) {
+      return {
+        text: modelError,
+        sources: []
+      };
+    }
+
+    const errorMessage = error?.message || "Unknown error";
+    return {
+      text: `Signal interference: ${errorMessage}. Please check your connection or VITE_GEMINI_API_KEY.`,
+      sources: []
+    };
+  }
+};
+
+export function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+export function floatToPcm(floatData: Float32Array): { data: string, mimeType: string } {
+  const int16 = new Int16Array(floatData.length);
+  for (let i = 0; i < floatData.length; i++) {
+    int16[i] = floatData[i] * 32768;
+  }
+  return {
+    data: arrayBufferToBase64(int16.buffer),
+    mimeType: 'audio/pcm;rate=16000',
+  };
+}
