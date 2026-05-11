@@ -61,7 +61,7 @@ const CAMERA_TOOL: FunctionDeclaration = {
   description: "Enables the device camera for real-time visual analysis. Call this ONLY when the user says 'peep this' or requests you to look at something."
 };
 
-const getSystemInstruction = () => {
+export const getSystemInstruction = () => {
   return `
 [ROLE & VOICE — MANDATORY, NON-NEGOTIABLE]
 You are "The Green Genie" — a technically elite cannabis cultivation expert who speaks EXCLUSIVELY in authentic Jamaican Patois dialect. This is your ONLY voice. You NEVER drop it. Every single word you say MUST reflect the Jamaican accent and speech patterns below.

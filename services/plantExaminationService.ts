@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { TEXT_MODEL } from "../config/geminiModels";
 import { Garden, Plant, Activity, AIExaminationResult, calculateAgeInDays } from "./myGardensStorage";
+import { getSystemInstruction } from "./geminiService";
 
 const getApiKey = () => {
   try {
@@ -18,30 +19,28 @@ const getApiKey = () => {
 
 function getPlantExaminationSystemPrompt(): string {
   return `
-You are a knowledgeable, beginner-friendly plant care assistant. Your role is to examine a plant based on its saved data, recent activity logs, and any user-provided concern.
+${getSystemInstruction()}
+
+You are examining a plant based on its saved data, recent activity logs, and any user-provided concern.
 
 Guidelines:
 - Use the plant's saved data before giving advice.
 - If information is missing, mention that it's missing rather than inventing it.
-- Give practical, actionable next steps.
-- If more details would help, ask for them.
-- Avoid making medical, legal, or unsafe claims.
-- Avoid extreme certainty. Use language like "possible," "may be," and "based on your logs."
-- Recommend monitoring and taking updated photos.
-- Keep feedback clear, practical, and beginner-friendly.
+- Give practical, actionable next steps in Jamaican Patois.
+- EVERY SINGLE STRING IN YOUR JSON RESPONSE (including plantSummary, whatLooksGood, possibleIssues, etc.) MUST be written entirely in your strict Jamaican Patois dialect as defined above. Do not break character in any field!
 
 You must respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON object.
 
 The JSON must have exactly this structure:
 {
-  "overallStatus": "A short overall status (e.g., 'Doing Well', 'Needs Attention', 'At Risk')",
-  "plantSummary": "A 2-3 sentence summary of the plant's current state based on the data provided.",
-  "whatLooksGood": ["List of positive observations"],
-  "possibleIssues": ["List of possible issues"],
-  "likelyCauses": ["List of likely causes for the issues"],
-  "recommendedNextSteps": ["List of actionable next steps"],
-  "whatToMonitor": ["List of things to keep an eye on"],
-  "suggestedReminder": "A short reminder suggestion like 'Check soil moisture in 2 days'",
+  "overallStatus": "A short overall status (e.g., 'Irie', 'Needs Attention', 'Danger Zone')",
+  "plantSummary": "A 2-3 sentence summary of the plant's current state based on the data provided, in Patois.",
+  "whatLooksGood": ["List of positive observations in Patois"],
+  "possibleIssues": ["List of possible issues in Patois"],
+  "likelyCauses": ["List of likely causes for the issues in Patois"],
+  "recommendedNextSteps": ["List of actionable next steps in Patois"],
+  "whatToMonitor": ["List of things to keep an eye on in Patois"],
+  "suggestedReminder": "A short reminder suggestion in Patois",
   "confidenceLevel": "Low | Medium | High"
 }
 `;
@@ -112,6 +111,7 @@ User's Concern: ${userConcern || 'No specific concern provided. Give a general h
         systemInstruction: getPlantExaminationSystemPrompt(),
         temperature: 0.3,
         maxOutputTokens: 2048,
+        responseMimeType: "application/json",
       },
       contents: [
         {
@@ -221,7 +221,8 @@ export async function generateComparisonReport(
   }
 
   const prompt = `
-You are the Green Genie, a knowledgeable cannabis cultivation assistant.
+${getSystemInstruction()}
+
 Generate a comparison report for the plant "${plant.name}" ${contextDesc}.
 
 Plant Current State:
@@ -248,7 +249,8 @@ Respond ONLY with a JSON object in this format:
       config: {
         systemInstruction: "You are a specialized cannabis cultivation analysis tool. Respond ONLY in valid JSON.",
         temperature: 0.3,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
       },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });

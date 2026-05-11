@@ -18,6 +18,7 @@ import {
 } from '../services/myGardensStorage';
 import { examinePlantWithAI, generateComparisonReport } from '../services/plantExaminationService';
 import { generateChatResponse } from '../services/geminiService';
+import { speakAgentVoice } from '../services/voiceService';
 
 const MyGardens: React.FC = () => {
   const navigate = useNavigate();
@@ -241,6 +242,10 @@ const MyGardens: React.FC = () => {
     if (selectedPlantId) {
       setActivities([...getActivitiesByPlant(selectedPlantId)]);
     }
+
+    if (!muteAssistant && result.plantSummary) {
+      speakAgentVoice(result.plantSummary);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -310,10 +315,8 @@ const MyGardens: React.FC = () => {
       const response = await generateChatResponse(prompt);
       setGrowAnswer(response.text);
       
-      if (!muteAssistant && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(response.text);
-        window.speechSynthesis.speak(utterance);
+      if (!muteAssistant) {
+        speakAgentVoice(response.text);
       }
     } catch (error) {
       console.error("Grow Assistant Error:", error);
@@ -334,10 +337,8 @@ const MyGardens: React.FC = () => {
       const result = await generateComparisonReport(selectedPlant, selectedGarden, activities, type);
       setReportHtml(result.html);
 
-      if (!muteAssistant && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(result.text);
-        window.speechSynthesis.speak(utterance);
+      if (!muteAssistant) {
+        speakAgentVoice(result.text);
       }
     } catch (err) {
       setReportHtml("<p class='text-rose-400'>Error generating report.</p>");
