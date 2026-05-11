@@ -16,7 +16,7 @@ import {
   getActivitiesByPlant, addActivity,
   generateId, calculateAgeInDays, getLastActivityDate, getRecentActivitiesByPlant, initStorage
 } from '../services/myGardensStorage';
-import { examinePlantWithAI } from '../services/plantExaminationService';
+import { examinePlantWithAI, generateComparisonReport } from '../services/plantExaminationService';
 import { generateChatResponse } from '../services/geminiService';
 
 const MyGardens: React.FC = () => {
@@ -62,6 +62,10 @@ const MyGardens: React.FC = () => {
   const [growAnswer, setGrowAnswer] = useState('');
   const [growQuestionLoading, setGrowQuestionLoading] = useState(false);
   const [muteAssistant, setMuteAssistant] = useState(false);
+
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportHtml, setReportHtml] = useState<string | null>(null);
+  const [reportType, setReportType] = useState<'last_exam' | 'weekly' | 'monthly'>('last_exam');
 
   const refreshData = useCallback(() => {
     setGardens([...getGardens()]);
@@ -316,6 +320,29 @@ const MyGardens: React.FC = () => {
       setGrowAnswer("Sorry, I couldn't reach the Green Genie right now. Please try again.");
     } finally {
       setGrowQuestionLoading(false);
+    }
+  };
+
+  // Comparison Report
+  const handleGenerateReport = async (type: 'last_exam' | 'weekly' | 'monthly') => {
+    if (!selectedPlant) return;
+    setReportType(type);
+    setReportLoading(true);
+    setReportHtml(null);
+
+    try {
+      const result = await generateComparisonReport(selectedPlant, selectedGarden, activities, type);
+      setReportHtml(result.html);
+
+      if (!muteAssistant && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(result.text);
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      setReportHtml("<p class='text-rose-400'>Error generating report.</p>");
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -703,6 +730,52 @@ const MyGardens: React.FC = () => {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Plant Reports */}
+              <div className="border-t border-white/5 pt-8 mt-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-emerald-400" /> Plant Reports
+                  </h3>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => handleGenerateReport('last_exam')}
+                    disabled={reportLoading}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${reportType === 'last_exam' && reportHtml ? 'bg-emerald-500 text-[#064e3b]' : 'bg-white/5 text-emerald-400 hover:bg-white/10'}`}
+                  >
+                    Compare Last Exams
+                  </button>
+                  <button
+                    onClick={() => handleGenerateReport('weekly')}
+                    disabled={reportLoading}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${reportType === 'weekly' && reportHtml ? 'bg-emerald-500 text-[#064e3b]' : 'bg-white/5 text-emerald-400 hover:bg-white/10'}`}
+                  >
+                    Weekly Report
+                  </button>
+                  <button
+                    onClick={() => handleGenerateReport('monthly')}
+                    disabled={reportLoading}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${reportType === 'monthly' && reportHtml ? 'bg-emerald-500 text-[#064e3b]' : 'bg-white/5 text-emerald-400 hover:bg-white/10'}`}
+                  >
+                    Monthly Report
+                  </button>
+                </div>
+                
+                {reportLoading && (
+                  <div className="flex items-center gap-3 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                    <div className="animate-spin w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full" />
+                    <p className="text-emerald-100/60 text-sm">Analyzing data and generating report...</p>
+                  </div>
+                )}
+                
+                {!reportLoading && reportHtml && (
+                  <div className="p-5 bg-white/[0.02] rounded-2xl border border-emerald-500/20 text-emerald-100/80 text-sm">
+                    <div dangerouslySetInnerHTML={{ __html: reportHtml }} />
                   </div>
                 )}
               </div>

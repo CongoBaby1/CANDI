@@ -184,3 +184,86 @@ function getFallbackResult(message: string): AIExaminationResult {
     confidenceLevel: "Low",
   };
 }
+
+export async function generateComparisonReport(
+  plant: Plant,
+  garden: Garden | null,
+  activities: Activity[],
+  timeRange: 'last_exam' | 'weekly' | 'monthly'
+): Promise<{ text: string, html: string }> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return { text: "API key not configured.", html: "<p>API key not configured.</p>" };
+  }
+
+  const now = new Date();
+  let filteredActivities = activities;
+  let contextDesc = "";
+
+  if (timeRange === 'weekly') {
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    filteredActivities = activities.filter(a => new Date(a.date) >= oneWeekAgo);
+    contextDesc = "over the past week";
+  } else if (timeRange === 'monthly') {
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    filteredActivities = activities.filter(a => new Date(a.date) >= oneMonthAgo);
+    contextDesc = "over the past month";
+  } else if (timeRange === 'last_exam') {
+    const exams = activities.filter(a => a.type === 'AI Examination').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (exams.length < 2) {
+      return { 
+        text: "Aye bredrin, yu need at least two AI examinations fi run a comparison. Run another exam first, seen?", 
+        html: "<p class='text-emerald-100/60'>You need at least two AI examinations to generate a comparison report.</p>" 
+      };
+    }
+    filteredActivities = activities.filter(a => new Date(a.date) >= new Date(exams[1].date));
+    contextDesc = "between the last two examinations";
+  }
+
+  const prompt = `
+You are the Green Genie, a knowledgeable cannabis cultivation assistant.
+Generate a comparison report for the plant "${plant.name}" ${contextDesc}.
+
+Plant Current State:
+- Stage: ${plant.stage}
+- Health: ${plant.healthStatus}
+- pH: ${plant.currentPH || 'N/A'}
+- PPM: ${plant.currentPPM || 'N/A'}
+
+Recent Activities (chronological):
+${filteredActivities.sort((a,b)=>new Date(a.date).getTime() - new Date(b.date).getTime()).map(a => `- [${a.date}] ${a.type}: ${a.notes} ${a.ph ? '(pH: '+a.ph+')' : ''} ${a.ppm ? '(PPM: '+a.ppm+')' : ''}`).join('\n')}
+
+Based on this data, provide:
+1. A conversational, spoken-word summary (in a friendly, expert Jamaican Patois tone, starting with 'Aye bredrin') analyzing how the plant has progressed, what changed, and what to look out for. This should be plain text.
+2. An HTML formatted report with bullet points, bold text, and a clean structure for the user to read on screen. Do not include markdown code block syntax inside the html string.
+
+Respond ONLY with a JSON object in this format:
+{"text": "Spoken word summary...", "html": "<h3>Report</h3><p>...</p>"}
+`;
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model: TEXT_MODEL,
+      config: {
+        systemInstruction: "You are a specialized cannabis cultivation analysis tool. Respond ONLY in valid JSON.",
+        temperature: 0.3,
+        maxOutputTokens: 1024,
+      },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+
+    let cleanText = response.text || "";
+    if (cleanText.startsWith("\`\`\`")) cleanText = cleanText.replace(/\`\`\`(json)?/g, "").trim();
+    if (cleanText.endsWith("\`\`\`")) cleanText = cleanText.substring(0, cleanText.length - 3);
+
+    const result = JSON.parse(cleanText);
+    return {
+      text: result.text || "Report generated.",
+      html: result.html || "<p>Report generated.</p>"
+    };
+  } catch (error) {
+    console.error("Comparison report failed", error);
+    return { text: "Signal interference. Couldn't generate the report right now.", html: "<p>Error generating report.</p>" };
+  }
+}
