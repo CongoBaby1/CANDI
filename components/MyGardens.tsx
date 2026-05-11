@@ -244,7 +244,9 @@ const MyGardens: React.FC = () => {
     }
 
     if (!muteAssistant && result.plantSummary) {
-      speakAgentVoice(result.plantSummary);
+      window.dispatchEvent(new CustomEvent('request-agent-speak', {
+        detail: { text: result.plantSummary, type: 'plant examination' }
+      }));
     }
   };
 
@@ -316,7 +318,9 @@ const MyGardens: React.FC = () => {
       setGrowAnswer(response.text);
       
       if (!muteAssistant) {
-        speakAgentVoice(response.text);
+        window.dispatchEvent(new CustomEvent('request-agent-speak', {
+          detail: { text: response.text, type: 'grow assistant answer' }
+        }));
       }
     } catch (error) {
       console.error("Grow Assistant Error:", error);
@@ -338,7 +342,9 @@ const MyGardens: React.FC = () => {
       setReportHtml(result.html);
 
       if (!muteAssistant) {
-        speakAgentVoice(result.text);
+        window.dispatchEvent(new CustomEvent('request-agent-speak', {
+          detail: { text: result.text, type: 'plant report' }
+        }));
       }
     } catch (err) {
       setReportHtml("<p class='text-rose-400'>Error generating report.</p>");

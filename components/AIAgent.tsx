@@ -115,6 +115,28 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
   useEffect(() => { isAgentSpeakingRef.current = isAgentSpeaking; }, [isAgentSpeaking]);
 
+  useEffect(() => {
+    const handleAgentSpeak = async (e: Event) => {
+      const customEvent = e as CustomEvent<{ text: string, type: string }>;
+      const { text, type } = customEvent.detail;
+      
+      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && !isMuted) {
+        try {
+          const session: any = await sessionPromiseRef.current;
+          let prompt = `SYSTEM_DIRECTIVE: The user requested a ${type}. Here is the generated information. Please provide a brief conversational, spoken-word summary of it in your persona:\n\n${text}`;
+          session.sendRealtimeInput({ text: prompt });
+        } catch (err) {
+          speakAgentVoice(text, isMuted);
+        }
+      } else {
+        speakAgentVoice(text, isMuted);
+      }
+    };
+    
+    window.addEventListener('request-agent-speak', handleAgentSpeak);
+    return () => window.removeEventListener('request-agent-speak', handleAgentSpeak);
+  }, [isVoiceMode, isMuted]);
+
   // Handle camera stream attachment to video element
   useEffect(() => {
     if (isCameraActive && videoRef.current && cameraStreamRef.current) {

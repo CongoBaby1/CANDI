@@ -125,10 +125,11 @@ User's Concern: ${userConcern || 'No specific concern provided. Give a general h
     
     // Try to parse JSON from the response
     try {
-      // Clean the response - remove markdown code blocks if present
+      // Extract JSON string from markdown code block if present
       let cleanText = text.trim();
-      if (cleanText.startsWith("```")) {
-        cleanText = cleanText.replace(/```(json)?/g, "").trim();
+      const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch && jsonMatch[1]) {
+        cleanText = jsonMatch[1].trim();
       }
       const result = JSON.parse(cleanText);
       
@@ -256,8 +257,11 @@ Respond ONLY with a JSON object in this format:
     });
 
     let cleanText = response.text || "";
-    if (cleanText.startsWith("\`\`\`")) cleanText = cleanText.replace(/\`\`\`(json)?/g, "").trim();
-    if (cleanText.endsWith("\`\`\`")) cleanText = cleanText.substring(0, cleanText.length - 3);
+    cleanText = cleanText.trim();
+    const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      cleanText = jsonMatch[1].trim();
+    }
 
     const result = JSON.parse(cleanText);
     return {
