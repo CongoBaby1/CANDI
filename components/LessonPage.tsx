@@ -3,14 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   BookOpen, Clock, AlertTriangle, Lightbulb, 
-  ArrowLeft, ChevronRight, ChevronLeft, X
+  ArrowLeft, ChevronRight, ChevronLeft, Volume2
 } from 'lucide-react';
 import { LESSONS } from '../data/cannabisUniversity';
 import { Lesson } from '../types';
+import { useVoice } from './VoiceContext';
 
 const LessonPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { speak } = useVoice();
   const [quizFeedback, setQuizFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
   
   const lessonIndex = LESSONS.findIndex(l => l.id === id);
@@ -67,9 +69,20 @@ const LessonPage: React.FC = () => {
           </span>
         </div>
 
-        <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter mb-8">
+        <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter mb-4">
           {lesson.title}
         </h1>
+
+        {/* Read Aloud Button */}
+        <button
+          onClick={() => {
+            const text = `${lesson.title}. ${lesson.summary}. Key points: ${lesson.keyPoints.join('. ')}. Quick tip: ${lesson.quickTip}.`;
+            speak(text);
+          }}
+          className="mb-8 flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-sm font-bold transition-all hover:scale-105"
+        >
+          <Volume2 className="w-4 h-4" /> Have di Genie Read Dis
+        </button>
 
         {/* Summary */}
         <p className="text-emerald-100/80 text-lg leading-relaxed mb-10">
@@ -119,10 +132,27 @@ const LessonPage: React.FC = () => {
                 <button
                   key={i}
                   onClick={() => {
+                    const correctAnswers = [
+                      "That's the right answer! Well done.",
+                      "Correct! You know your stuff, respect!",
+                      "Nailed it! That's exactly right.",
+                      "Yes! You got it. Legend status.",
+                      "Sharp! That's the correct answer.",
+                    ];
+                    const wrongAnswers = [
+                      "Not quite, but keep studying. You're almost there!",
+                      "That's not it, but don't worry — read it again.",
+                      "Close, but not right. Give it another look.",
+                      "Hmm, try again. The answer is closer than you think!",
+                    ];
                     if (opt === lesson.quiz.answer) {
-                      setQuizFeedback({ isCorrect: true, message: "Correct! Legend status." });
+                      const msg = correctAnswers[Math.floor(Math.random() * correctAnswers.length)];
+                      setQuizFeedback({ isCorrect: true, message: msg });
+                      speak(msg);
                     } else {
-                      setQuizFeedback({ isCorrect: false, message: "Not quite, but keep learning!" });
+                      const msg = wrongAnswers[Math.floor(Math.random() * wrongAnswers.length)];
+                      setQuizFeedback({ isCorrect: false, message: msg });
+                      speak(msg);
                     }
                   }}
                   className={`py-4 px-6 rounded-xl border transition-all font-medium text-sm ${

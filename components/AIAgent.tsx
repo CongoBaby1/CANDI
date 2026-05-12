@@ -14,6 +14,7 @@ import { BUSINESS_INFO, SAMPLE_PROMPTS } from '../constants';
 import { TEXT_MODEL, LIVE_MODEL, getModelErrorMessage } from '../config/geminiModels';
 import { Cultivator } from '../types';
 import { speakAgentVoice } from '../services/voiceService';
+import { useVoice } from './VoiceContext';
 
 interface AIAgentProps {
   onAdminAuth: (phrase: string) => void;
@@ -111,31 +112,37 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const isAgentSpeakingRef = useRef(false);
   const isProcessingRef = useRef(false);
 
+  const { registerLiveSpeak } = useVoice();
+
   useEffect(() => { chatHistoryRef.current = messages; }, [messages]);
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
   useEffect(() => { isAgentSpeakingRef.current = isAgentSpeaking; }, [isAgentSpeaking]);
 
+  // Register / deregister the live speak function in the global VoiceContext
+  // whenever the session opens or closes, or mute state changes
   useEffect(() => {
-    const handleAgentSpeak = async (e: Event) => {
-      const customEvent = e as CustomEvent<{ text: string, type: string }>;
-      const { text, type } = customEvent.detail;
-      
-      if (isVoiceMode && isSessionLiveRef.current && sessionPromiseRef.current && !isMuted) {
-        try {
-          const session: any = await sessionPromiseRef.current;
-          let prompt = `SYSTEM_DIRECTIVE: The user requested a ${type}. Here is the generated information. Please provide a brief conversational, spoken-word summary of it in your persona:\n\n${text}`;
-          session.sendRealtimeInput({ text: prompt });
-        } catch (err) {
+    if (isOpen && isSessionLiveRef.current && !isMuted) {
+      registerLiveSpeak((text: string) => {
+        // Send text to the live Gemini session so it speaks in its own voice
+        if (sessionPromiseRef.current && isSessionLiveRef.current) {
+          sessionPromiseRef.current.then((session: any) => {
+            try {
+              session.sendRealtimeInput({
+                text: `SPEAK THIS ALOUD in your Green Genie persona: ${text}`
+              });
+            } catch {
+              speakAgentVoice(text, isMuted);
+            }
+          });
+        } else {
           speakAgentVoice(text, isMuted);
         }
-      } else {
-        speakAgentVoice(text, isMuted);
-      }
-    };
-    
-    window.addEventListener('request-agent-speak', handleAgentSpeak);
-    return () => window.removeEventListener('request-agent-speak', handleAgentSpeak);
-  }, [isVoiceMode, isMuted]);
+      });
+    } else {
+      // No live session — fall back to browser TTS from VoiceContext
+      registerLiveSpeak(null);
+    }
+  }, [isOpen, isMuted, registerLiveSpeak]);
 
   // Handle camera stream attachment to video element
   useEffect(() => {
@@ -260,12 +267,15 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     isPendingTerminationRef.current = false;
     isPendingModalRef.current = false;
     
+    // Deregister live speak — fall back to browser TTS
+    registerLiveSpeak(null);
+
     if (sessionPromiseRef.current) {
       sessionPromiseRef.current.then(s => { try { s.close(); } catch {} });
       sessionPromiseRef.current = null;
     }
     setIsOpen(false);
-  }, [stopAllAudio, cleanupAudioNodes]);
+  }, [stopAllAudio, cleanupAudioNodes, registerLiveSpeak]);
 
   const checkSecretPhrase = useCallback((text: string) => {
     const normalized = text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
@@ -481,6 +491,24 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             microphoneStreamRef.current = stream;
             setIsAgentSpeaking(true);
             isSessionLiveRef.current = true;
+
+            // Register this live session's speak capability in the global VoiceContext
+            registerLiveSpeak((text: string) => {
+              if (sessionPromiseRef.current && isSessionLiveRef.current && !isMuted) {
+                sessionPromiseRef.current.then((session: any) => {
+                  try {
+                    session.sendRealtimeInput({
+                      text: `SPEAK THIS ALOUD in your Green Genie persona (Jamaican Patois): ${text}`
+                    });
+                  } catch {
+                    speakAgentVoice(text, isMuted);
+                  }
+                });
+              } else {
+                speakAgentVoice(text, isMuted);
+              }
+            });
+
             
             const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
             sourceNodeRef.current = source;
@@ -511,7 +539,30 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
             processor.connect(inputAudioContextRef.current!.destination);
             
             sessionPromise.then((session: any) => {
-              try { session.sendRealtimeInput({ text: "SYSTEM_START" }); } catch (e) { }
+              const greetings = [
+                "Hey! The Green Genie is here. What do you need today?",
+                "Welcome back, grower! The Green Genie is ready to help.",
+                "What's good! How is your grow doing today?",
+                "Respect! The Green Genie is in the building.",
+                "Big up! What can I do for your plants today?",
+                "Let's grow! Talk to me, what's on your mind?",
+                "The Green Genie is online. What do you need?",
+                "Blessings! How is the garden looking today?",
+                "You know what time it is! What do you need for the grow?",
+                "The Green Genie is ready to chat. What's going on?",
+                "Boom! What issue are you dealing with today?",
+                "Greetings, grow family! Talk to me.",
+                "Hey boss grower! How are things going?",
+                "Respect and prosperity! What do you need?",
+                "Good vibes! The Green Genie is on deck.",
+                "What's good, cannabis champion?",
+                "Let's fix those plants today. What's happening?",
+                "Hey! How are the ladies looking?",
+                "What can I solve for you today?",
+                "The Green Genie is live and ready. Talk to me.",
+              ];
+              const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+              try { session.sendRealtimeInput({ text: `SYSTEM_START. Greet the user now by saying warmly: "${greeting}"` }); } catch (e) { }
             });
           } catch (micErr: any) {
             console.error("[AIAgent] Hardware link failed:", micErr);

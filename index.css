@@ -30,3 +30,15 @@
     --radius: 1rem;
   }
 }
+
+/* ── Bouncing dot loader ─────────────────────────────────────────────────── */
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}

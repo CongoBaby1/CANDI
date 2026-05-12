@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,11 +18,12 @@ import {
   generateId, calculateAgeInDays, getLastActivityDate, getRecentActivitiesByPlant, initStorage
 } from '../services/myGardensStorage';
 import { examinePlantWithAI, generateComparisonReport } from '../services/plantExaminationService';
-import { generateChatResponse } from '../services/geminiService';
-import { speakAgentVoice } from '../services/voiceService';
+import { generateChatResponse, streamChatResponse } from '../services/geminiService';
+import { useVoice } from './VoiceContext';
 
 const MyGardens: React.FC = () => {
   const navigate = useNavigate();
+  const { speak } = useVoice();
   const [gardens, setGardens] = useState<Garden[]>([]);
   const [selectedGardenId, setSelectedGardenId] = useState<string | null>(null);
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -244,9 +246,7 @@ const MyGardens: React.FC = () => {
     }
 
     if (!muteAssistant && result.plantSummary) {
-      window.dispatchEvent(new CustomEvent('request-agent-speak', {
-        detail: { text: result.plantSummary, type: 'plant examination' }
-      }));
+      speak(result.plantSummary);
     }
   };
 
@@ -300,12 +300,12 @@ const MyGardens: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Grow Assistant
+  // Grow Assistant — streams response for instant word-by-word feedback
   const handleGrowQuestion = async () => {
     if (!growQuestion.trim()) return;
     setGrowQuestionLoading(true);
     setGrowAnswer('');
-    
+
     try {
       let prompt = growQuestion;
       if (selectedPlant) {
@@ -313,18 +313,18 @@ const MyGardens: React.FC = () => {
       } else if (selectedGarden) {
         prompt = `Context: User is asking about their garden named "${selectedGarden.name}". It is a ${selectedGarden.type} located in ${selectedGarden.location || 'unknown'}.\n\nUser Question: ${growQuestion}`;
       }
-      
-      const response = await generateChatResponse(prompt);
-      setGrowAnswer(response.text);
-      
+
+      // Stream chunks in — answer appears word-by-word immediately
+      const fullText = await streamChatResponse(prompt, (chunk) => {
+        setGrowAnswer(prev => prev + chunk);
+      });
+
       if (!muteAssistant) {
-        window.dispatchEvent(new CustomEvent('request-agent-speak', {
-          detail: { text: response.text, type: 'grow assistant answer' }
-        }));
+        speak(fullText);
       }
     } catch (error) {
-      console.error("Grow Assistant Error:", error);
-      setGrowAnswer("Sorry, I couldn't reach the Green Genie right now. Please try again.");
+      console.error('Grow Assistant Error:', error);
+      setGrowAnswer("Sorry, I couldn't reach the assistant right now. Please try again.");
     } finally {
       setGrowQuestionLoading(false);
     }
@@ -342,9 +342,7 @@ const MyGardens: React.FC = () => {
       setReportHtml(result.html);
 
       if (!muteAssistant) {
-        window.dispatchEvent(new CustomEvent('request-agent-speak', {
-          detail: { text: result.text, type: 'plant report' }
-        }));
+        speak(result.text);
       }
     } catch (err) {
       setReportHtml("<p class='text-rose-400'>Error generating report.</p>");
@@ -775,8 +773,20 @@ const MyGardens: React.FC = () => {
                 
                 {reportLoading && (
                   <div className="flex items-center gap-3 p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                    <div className="animate-spin w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full" />
-                    <p className="text-emerald-100/60 text-sm">Analyzing data and generating report...</p>
+                    {/* Bouncing dots */}
+                    <div className="flex items-center gap-1.5">
+                      {[0, 1, 2].map(i => (
+                        <span
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-full bg-emerald-400"
+                          style={{
+                            display: 'inline-block',
+                            animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-emerald-100/60 text-sm">Analyzing your plant data...</p>
                   </div>
                 )}
                 
@@ -819,9 +829,19 @@ const MyGardens: React.FC = () => {
                   <button
                     onClick={handleGrowQuestion}
                     disabled={growQuestionLoading}
-                    className="px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-xl transition-all text-sm disabled:opacity-50"
+                    className="px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-xl transition-all text-sm disabled:opacity-50 flex items-center gap-2 min-w-[70px] justify-center"
                   >
-                    {growQuestionLoading ? '...' : 'Ask'}
+                    {growQuestionLoading ? (
+                      <span className="flex items-center gap-1">
+                        {[0, 1, 2].map(i => (
+                          <span
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                            style={{ display: 'inline-block', animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
+                          />
+                        ))}
+                      </span>
+                    ) : 'Ask'}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -836,8 +856,26 @@ const MyGardens: React.FC = () => {
                   ))}
                 </div>
                 {growAnswer && (
-                  <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                    <p className="text-emerald-100/70 text-sm">{growAnswer}</p>
+                  <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 text-emerald-100/70 text-sm leading-relaxed">
+                    <ReactMarkdown
+                      components={{
+                        a: ({ node, ...props }) => (
+                          <a
+                            {...props}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:text-emerald-300 underline font-bold break-all transition-colors"
+                          />
+                        ),
+                        p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0" />,
+                        ul: ({ node, ...props }) => <ul {...props} className="list-disc pl-4 mb-2 space-y-1" />,
+                        ol: ({ node, ...props }) => <ol {...props} className="list-decimal pl-4 mb-2 space-y-1" />,
+                        li: ({ node, ...props }) => <li {...props} className="mb-0.5" />,
+                        strong: ({ node, ...props }) => <strong {...props} className="font-bold text-emerald-300" />,
+                      }}
+                    >
+                      {growAnswer}
+                    </ReactMarkdown>
                   </div>
                 )}
               </div>

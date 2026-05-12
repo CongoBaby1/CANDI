@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { TEXT_MODEL } from "../config/geminiModels";
+import { TEXT_MODEL, FAST_TEXT_MODEL } from "../config/geminiModels";
 import { Garden, Plant, Activity, AIExaminationResult, calculateAgeInDays } from "./myGardensStorage";
-import { getSystemInstruction } from "./geminiService";
 
 const getApiKey = () => {
   try {
@@ -17,33 +16,16 @@ const getApiKey = () => {
   }
 };
 
+// Lean, fast system prompt — focused only on what the model needs for plant examination.
 function getPlantExaminationSystemPrompt(): string {
-  return `
-${getSystemInstruction()}
-
-You are examining a plant based on its saved data, recent activity logs, and any user-provided concern.
-
-Guidelines:
-- Use the plant's saved data before giving advice.
-- If information is missing, mention that it's missing rather than inventing it.
-- Give practical, actionable next steps in Jamaican Patois.
-- EVERY SINGLE STRING IN YOUR JSON RESPONSE (including plantSummary, whatLooksGood, possibleIssues, etc.) MUST be written entirely in your strict Jamaican Patois dialect as defined above. Do not break character in any field!
-
-You must respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON object.
-
-The JSON must have exactly this structure:
-{
-  "overallStatus": "A short overall status (e.g., 'Irie', 'Needs Attention', 'Danger Zone')",
-  "plantSummary": "A 2-3 sentence summary of the plant's current state based on the data provided, in Patois.",
-  "whatLooksGood": ["List of positive observations in Patois"],
-  "possibleIssues": ["List of possible issues in Patois"],
-  "likelyCauses": ["List of likely causes for the issues in Patois"],
-  "recommendedNextSteps": ["List of actionable next steps in Patois"],
-  "whatToMonitor": ["List of things to keep an eye on in Patois"],
-  "suggestedReminder": "A short reminder suggestion in Patois",
-  "confidenceLevel": "Low | Medium | High"
-}
-`;
+  return `You are The Green Genie, an expert cannabis cultivation AI.
+You are examining a plant based on its data and activity logs.
+Rules:
+- Write ALL responses in clear, plain English. Do NOT use Jamaican Patois in text.
+- Use the plant data provided. Do not invent missing information.
+- Respond with ONLY valid JSON. No markdown. No explanation outside the JSON.
+JSON structure (exactly this, no extra fields):
+{"overallStatus":"...","plantSummary":"...","whatLooksGood":[...],"possibleIssues":[...],"likelyCauses":[...],"recommendedNextSteps":[...],"whatToMonitor":[...],"suggestedReminder":"...","confidenceLevel":"Low|Medium|High"}`;
 }
 
 export async function examinePlantWithAI(
@@ -106,11 +88,12 @@ User's Concern: ${userConcern || 'No specific concern provided. Give a general h
     }
 
     const response = await ai.models.generateContent({
-      model: TEXT_MODEL,
+      // Use fast model for text-only examination, full model when an image is included
+      model: imageBase64 ? TEXT_MODEL : FAST_TEXT_MODEL,
       config: {
         systemInstruction: getPlantExaminationSystemPrompt(),
-        temperature: 0.3,
-        maxOutputTokens: 2048,
+        temperature: 0.2,
+        maxOutputTokens: 2048,   // Must be high enough to fit full JSON response
         responseMimeType: "application/json",
       },
       contents: [
@@ -221,55 +204,53 @@ export async function generateComparisonReport(
     contextDesc = "between the last two examinations";
   }
 
-  const prompt = `
-${getSystemInstruction()}
+  const prompt = `Generate a ${contextDesc} plant report for "${plant.name}".
 
-Generate a comparison report for the plant "${plant.name}" ${contextDesc}.
+Plant state: Stage=${plant.stage}, Health=${plant.healthStatus}, pH=${plant.currentPH || 'N/A'}, PPM=${plant.currentPPM || 'N/A'}
 
-Plant Current State:
-- Stage: ${plant.stage}
-- Health: ${plant.healthStatus}
-- pH: ${plant.currentPH || 'N/A'}
-- PPM: ${plant.currentPPM || 'N/A'}
+Activities:
+${filteredActivities.sort((a,b)=>new Date(a.date).getTime()-new Date(b.date).getTime()).map(a=>`[${new Date(a.date).toLocaleDateString()}] ${a.type}: ${a.notes||''}${a.ph?' pH:'+a.ph:''}${a.ppm?' PPM:'+a.ppm:''}`).join('\n')}
 
-Recent Activities (chronological):
-${filteredActivities.sort((a,b)=>new Date(a.date).getTime() - new Date(b.date).getTime()).map(a => `- [${a.date}] ${a.type}: ${a.notes} ${a.ph ? '(pH: '+a.ph+')' : ''} ${a.ppm ? '(PPM: '+a.ppm+')' : ''}`).join('\n')}
-
-Based on this data, provide:
-1. A conversational, spoken-word summary (in a friendly, expert Jamaican Patois tone, starting with 'Aye bredrin') analyzing how the plant has progressed, what changed, and what to look out for. This should be plain text.
-2. An HTML formatted report with bullet points, bold text, and a clean structure for the user to read on screen. Do not include markdown code block syntax inside the html string.
-
-Respond ONLY with a JSON object in this format:
-{"text": "Spoken word summary...", "html": "<h3>Report</h3><p>...</p>"}
-`;
+Respond ONLY with this JSON (no markdown, no extra text):
+{"text":"A plain English spoken summary of the plant's progress and what to watch for, starting with 'Hey there grower,...'","html":"<h3>Report</h3><p>...</p>"}`;
 
   const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
-      model: TEXT_MODEL,
+      model: FAST_TEXT_MODEL,  // Text-only report — use the faster model
       config: {
-        systemInstruction: "You are a specialized cannabis cultivation analysis tool. Respond ONLY in valid JSON.",
-        temperature: 0.3,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
+        // NOTE: Do NOT use responseMimeType: "application/json" here.
+        // The html field contains HTML tags which confuse strict JSON mode.
+        systemInstruction: "You are The Green Genie, a cannabis cultivation expert. Write ALL responses in plain English. Return ONLY a single valid JSON object. No markdown. No code blocks.",
+        temperature: 0.2,
+        maxOutputTokens: 2048,   // Must be high enough for full JSON — 1024 was causing truncation
       },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
-    let cleanText = response.text || "";
-    cleanText = cleanText.trim();
-    const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      cleanText = jsonMatch[1].trim();
+    let cleanText = (response.text || "").trim();
+
+    // Strip markdown code fences if present
+    const fenceMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenceMatch && fenceMatch[1]) {
+      cleanText = fenceMatch[1].trim();
     }
 
+    // Find the JSON object boundaries robustly
+    const firstBrace = cleanText.indexOf('{');
+    const lastBrace = cleanText.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+    }
+
+    console.log("[PlantReport] Parsing JSON:", cleanText.substring(0, 200));
     const result = JSON.parse(cleanText);
     return {
       text: result.text || "Report generated.",
       html: result.html || "<p>Report generated.</p>"
     };
   } catch (error) {
-    console.error("Comparison report failed", error);
-    return { text: "Signal interference. Couldn't generate the report right now.", html: "<p>Error generating report.</p>" };
+    console.error("[PlantReport] Comparison report failed:", error);
+    return { text: "Signal interference. Couldn't generate the report right now.", html: "<p class='text-rose-400'>Error generating report. Please try again.</p>" };
   }
 }
