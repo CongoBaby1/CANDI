@@ -355,11 +355,11 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
     if (isVoiceMode) isProcessingRef.current = true;
     setIsThinking(true);
 
-    // Auto-clear thinking after 30s as safety net
+    // Auto-clear thinking after 90s as safety net (raised from 30s for search + long replies)
     const thinkingTimeout = setTimeout(() => {
       setIsThinking(false);
       isProcessingRef.current = false;
-    }, 30000);
+    }, 90000);
 
     try {
       const response = await generateChatResponse(msg, chatHistoryRef.current, attachmentsToUse);
