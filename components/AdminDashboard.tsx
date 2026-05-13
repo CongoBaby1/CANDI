@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Users, Trash2, 
-  RefreshCcw, LogOut, Search, Plus, User, Check, Edit2, Save, X, Star, Activity, TrendingUp
+  RefreshCcw, LogOut, Search, Plus, User, Check, Edit2, Save, X, Star, Activity, TrendingUp, Download
 } from 'lucide-react';
 import { Service, Consultation, Grower, Cultivator, SystemLog, ServiceCategory } from '../types';
 import { db } from '../services/databaseService';
@@ -111,6 +111,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } catch (error) { console.error(error); } finally { setIsProcessing(false); }
   };
 
+  const handleExportData = () => {
+    const keys = ['gh_growers', 'gh_consultations', 'gh_cultivators', 'gh_services', 'gg_gardens', 'gg_plants'];
+    const exportObj: Record<string, any> = {};
+    keys.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        exportObj[k] = raw ? JSON.parse(raw) : [];
+      } catch {
+        exportObj[k] = [];
+      }
+    });
+    const date = new Date().toISOString().split('T')[0];
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `green-genie-backup-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDeleteMember = async (id: string) => {
     if (!window.confirm("Delete cultivator record?")) return;
     setIsProcessing(true);
@@ -149,6 +170,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <header className="px-10 py-6 bg-white border-b border-emerald-100 flex justify-between items-center shrink-0">
           <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tighter mono font-mono">{activeTab}</h1>
           <div className="flex items-center gap-3">
+            <button onClick={handleExportData} title="Export all data as JSON backup" className="flex items-center gap-2 px-4 py-2.5 border border-emerald-200 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-emerald-50 transition mono font-mono">
+              <Download size={15} /> Export
+            </button>
             <button onClick={() => refreshData()} className="p-2.5 text-slate-400 hover:text-slate-900 transition-all">
               <RefreshCcw size={18} className={isProcessing ? 'animate-spin' : ''} />
             </button>

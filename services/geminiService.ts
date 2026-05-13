@@ -21,6 +21,11 @@ const getApiKey = () => {
   }
 };
 
+export const isApiKeyConfigured = (): boolean => {
+  const key = getApiKey();
+  return key !== null && key !== undefined && key.trim().length > 10;
+};
+
 const ACTION_TOOL: FunctionDeclaration = {
   name: "requestConsultationConfirmation",
   description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
@@ -127,9 +132,9 @@ When troubleshooting any plant issue, follow this sequence:
 [OPERATIONAL BEHAVIOR]
 1. Respond to the User: Answer their SPECIFIC question first.
 2. Contextual Check: Only alert about environment danger zones when the user's data is actively drifting.
-3. Use Google Search: When the user asks you to search, find, get, or look up ANYTHING — you MUST use your Web Search tool immediately. Do not describe or narrate the search. Just do it.
-4. LINKS ARE MANDATORY: Every time you mention a product, website, strain, service, or searchable resource, you MUST include its direct URL as a clickable markdown link in this exact format: [Name](https://actual-url.com). NEVER give a product name without a link. NEVER say "you can find this at..." without providing the actual URL. If you find results via search, include their source URLs.
-5. Link quality: Only include URLs you are confident are real and active. Prefer official brand sites, reputable retailers, or authoritative sources. Do not fabricate URLs.
+3. Use Google Search: When the user asks you to search, find, get, or look up ANYTHING — you MUST use your Web Search tool immediately. Do not describe or narrate the search. Just do it. ALSO use Google Search any time you are about to include a product link — search first, then use the URL returned by the search.
+4. LINKS ARE MANDATORY AND MUST BE VERIFIED: Every time you mention a product, website, strain, service, or searchable resource, you MUST include its direct URL as a clickable markdown link in this exact format: [Name](https://actual-url.com). NEVER give a product name without a link. NEVER say "you can find this at..." without providing the actual URL. If you find results via search, include their source URLs directly.
+5. Link verification (CRITICAL): Before including ANY URL, you MUST have retrieved it from a Google Search result in this session. NEVER fabricate, guess, or recall a URL from memory. If you have not searched for it yet, search first — then include the link from the actual search result. A fabricated link is worse than no link.
 6. Search Brevity: Present search results concisely with links inline. Do not recap the search process.
 `;
 };
@@ -228,7 +233,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   // Transform history to Gemini format
-  const contents = history.map(h => ({
+  const contents = history.slice(-20).map(h => ({
     role: h.role === 'agent' ? 'model' : 'user',
     parts: [{ text: h.text }]
   }));
@@ -257,10 +262,10 @@ export const generateChatResponse = async (message: string, history: any[] = [],
       model: attachments.length > 0 ? TEXT_MODEL : FAST_TEXT_MODEL,
       config: { 
         systemInstruction: getSystemInstruction(),
-        maxOutputTokens: 512,   // Cap output — agent stays brief, big speedup
+        maxOutputTokens: 2048,  // Raised from 512 — prevents cut-off on long replies
         temperature: 0.7,
-        // Only enable Google Search for plain-text queries (tool use adds a round-trip)
-        ...(attachments.length === 0 ? { tools: [{ googleSearch: {} }] } : {}),
+        // Always enable Google Search so links can be verified before returning
+        tools: [{ googleSearch: {} }],
       },
       contents,
     });
@@ -295,7 +300,7 @@ export const streamChatResponse = async (
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-  const contents = history.map(h => ({
+  const contents = history.slice(-20).map(h => ({
     role: h.role === 'agent' ? 'model' : 'user',
     parts: [{ text: h.text }]
   }));
@@ -309,9 +314,9 @@ export const streamChatResponse = async (
       model: attachments.length > 0 ? TEXT_MODEL : FAST_TEXT_MODEL,
       config: {
         systemInstruction: getSystemInstruction(),
-        maxOutputTokens: 512,
+        maxOutputTokens: 2048,  // Raised from 512 — prevents cut-off on long replies
         temperature: 0.7,
-        ...(attachments.length === 0 ? { tools: [{ googleSearch: {} }] } : {}),
+        tools: [{ googleSearch: {} }],  // Always active for link verification
       },
       contents,
     });
