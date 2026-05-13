@@ -8,7 +8,8 @@ import {
   base64ToUint8Array, 
   decodeAudioData, 
   floatToPcm,
-  FileAttachment
+  FileAttachment,
+  isApiKeyConfigured
 } from '../services/geminiService';
 import { BUSINESS_INFO, SAMPLE_PROMPTS } from '../constants';
 import { TEXT_MODEL, LIVE_MODEL, getModelErrorMessage } from '../config/geminiModels';
@@ -21,6 +22,9 @@ interface AIAgentProps {
   onConsultation: (consultation: any) => void;
   cultivators?: Cultivator[];
 }
+
+const CHAT_STORAGE_KEY = 'gg_chat_history';
+const MAX_STORED_MESSAGES = 50;
 
 const ConsultationConfirmationModal = ({ consultation, onConfirm, onCancel }: { consultation: any, onConfirm: () => void, onCancel: () => void }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-md">
@@ -71,7 +75,16 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(true);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.slice(-MAX_STORED_MESSAGES) : [];
+      }
+    } catch {}
+    return [];
+  });
   const [inputText, setInputText] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
@@ -115,6 +128,11 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   const { registerLiveSpeak } = useVoice();
 
   useEffect(() => { chatHistoryRef.current = messages; }, [messages]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+    } catch {}
+  }, [messages]);
   useEffect(() => { isVoiceActiveRef.current = isVoiceMode; }, [isVoiceMode]);
   useEffect(() => { isAgentSpeakingRef.current = isAgentSpeaking; }, [isAgentSpeaking]);
 
@@ -446,6 +464,10 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
   };
 
   const startSession = async () => {
+    if (!isApiKeyConfigured()) {
+      setErrorState("⚠️ Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env.local file and restart the dev server.");
+      return;
+    }
     console.log("[AIAgent] Starting Neural Link initialization...");
     setErrorState(null);
     setIsConnecting(true);
@@ -784,6 +806,13 @@ const AIAgent: React.FC<AIAgentProps> = ({ onAdminAuth, onConsultation, cultivat
                 title={isMuted ? "Unmute Agent" : "Mute Agent"}
               >
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+              <button
+                onClick={() => { setMessages([]); localStorage.removeItem(CHAT_STORAGE_KEY); }}
+                title="Clear chat history"
+                className="p-2 hover:bg-white/10 rounded-full transition text-white/60 hover:text-white text-[9px] font-bold uppercase tracking-widest mono"
+              >
+                Clear
               </button>
               <button onClick={closeSession} className="p-2 md:p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-emerald-100/40 hover:text-white">
                 <X size={20} />

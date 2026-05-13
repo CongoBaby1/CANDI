@@ -21,6 +21,11 @@ const getApiKey = () => {
   }
 };
 
+export const isApiKeyConfigured = (): boolean => {
+  const key = getApiKey();
+  return key !== null && key !== undefined && key.trim().length > 10;
+};
+
 const ACTION_TOOL: FunctionDeclaration = {
   name: "requestConsultationConfirmation",
   description: "Call this tool ONLY when you have summarized the consultation details (Name, Contact, Growth Stage, Current Temp/RH, and Recommended Action) to the user.",
@@ -228,7 +233,7 @@ export const generateChatResponse = async (message: string, history: any[] = [],
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
   
   // Transform history to Gemini format
-  const contents = history.map(h => ({
+  const contents = history.slice(-20).map(h => ({
     role: h.role === 'agent' ? 'model' : 'user',
     parts: [{ text: h.text }]
   }));
@@ -295,7 +300,7 @@ export const streamChatResponse = async (
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-  const contents = history.map(h => ({
+  const contents = history.slice(-20).map(h => ({
     role: h.role === 'agent' ? 'model' : 'user',
     parts: [{ text: h.text }]
   }));
