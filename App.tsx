@@ -1,17 +1,13 @@
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import AIAgent from './components/AIAgent';
-import Hero from './components/Hero';
-import Services from './components/Services';
-import Location from './components/Location';
-const CannabisUniversity = lazy(() => import('./components/CannabisUniversity'));
-const LessonPage = lazy(() => import('./components/LessonPage'));
-const MyGardens = lazy(() => import('./components/MyGardens'));
+import CannabisUniversity from './components/CannabisUniversity';
+import LessonPage from './components/LessonPage';
+import MyGardens from './components/MyGardens';
 import { Cultivator, SystemLog } from './types';
 import { db } from './services/databaseService';
-import { INITIAL_SERVICES } from './constants';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -19,7 +15,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [cultivators, setCultivators] = useState<Cultivator[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
-  const [services, setServices] = useState<any[]>([]);
   const location = useLocation();
 
   // Scroll to top on every route change
@@ -29,14 +24,12 @@ const App: React.FC = () => {
 
   const refreshData = async () => {
     try {
-      const [t, logsData, servicesData] = await Promise.all([
+      const [t, logsData] = await Promise.all([
         db.getCultivators(),
-        db.getLogs(),
-        db.getServices()
+        db.getLogs()
       ]);
       setCultivators(t || []);
       setLogs(logsData || []);
-      setServices(servicesData || []);
     } catch (err) {
       console.warn("Nexus Sync: Falling back to local state.");
     }
@@ -88,11 +81,6 @@ const App: React.FC = () => {
     console.log("System override protocol:", phrase);
   };
 
-  const handleScrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[#064e3b] text-white">
@@ -127,20 +115,12 @@ const App: React.FC = () => {
       <Header />
       
       <main className="relative z-10">
-        <Suspense fallback={<div className="h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 text-emerald-400 animate-spin" /></div>}>
-          <Routes>
-            <Route path="/" element={
-              <>
-                <Hero onScrollTo={handleScrollTo} />
-                <Services services={services.length > 0 ? services : INITIAL_SERVICES} />
-                <Location />
-              </>
-            } />
-            <Route path="/cannabis-university" element={<CannabisUniversity />} />
-            <Route path="/cannabis-university/lesson/:id" element={<LessonPage />} />
-            <Route path="/my-gardens" element={<MyGardens />} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<div className="h-screen" />} />
+          <Route path="/cannabis-university" element={<CannabisUniversity />} />
+          <Route path="/cannabis-university/lesson/:id" element={<LessonPage />} />
+          <Route path="/my-gardens" element={<MyGardens />} />
+        </Routes>
       </main>
 
       <AIAgent 

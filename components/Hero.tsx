@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Sparkles } from 'lucide-react';
 import { HERO_IMAGE } from '../constants';
 import { ChevronRight, Zap } from 'lucide-react';
 
@@ -39,82 +40,9 @@ const Hero: React.FC<HeroProps> = ({ onScrollTo }) => {
               Start Analysis <ChevronRight size={16} />
             </button>
           </div>
-          <VPDCalculator />
         </div>
       </div>
     </section>
-  );
-};
-
-const VPDCalculator: React.FC = () => {
-  const [temp, setTemp] = React.useState('');
-  const [rh, setRh] = React.useState('');
-  const [unit, setUnit] = React.useState<'C' | 'F'>('F');
-
-  const calcVPD = () => {
-    const t = parseFloat(temp);
-    const r = parseFloat(rh);
-    if (isNaN(t) || isNaN(r) || r <= 0 || r > 100) return null;
-    const tC = unit === 'F' ? (t - 32) * 5 / 9 : t;
-    const leafT = tC - 2;
-    const vpSat = (T: number) => 0.61078 * Math.exp((17.27 * T) / (T + 237.3));
-    const vpd = vpSat(leafT) - vpSat(tC) * (r / 100);
-    return vpd.toFixed(3);
-  };
-
-  const vpd = calcVPD();
-  const getZone = (v: number) => {
-    if (v < 0.4) return { label: 'Too Humid', color: 'text-blue-400' };
-    if (v < 0.6) return { label: 'Seedling Zone', color: 'text-cyan-400' };
-    if (v < 0.8) return { label: 'Early Veg', color: 'text-emerald-300' };
-    if (v < 1.2) return { label: '\u2713 Vegetative', color: 'text-emerald-400' };
-    if (v < 1.5) return { label: '\u2713 Flowering', color: 'text-green-400' };
-    return { label: 'Too Dry', color: 'text-red-400' };
-  };
-
-  const zone = vpd ? getZone(parseFloat(vpd)) : null;
-
-  return (
-    <div className="mt-16 inline-block bg-white/5 border border-white/10 backdrop-blur-md rounded-3xl px-8 py-6 text-left w-full max-w-md mx-auto">
-      <p className="text-emerald-400 text-[9px] font-black uppercase tracking-[0.35em] mono mb-4">⚡ Live VPD Calculator</p>
-      <div className="flex gap-3 items-end">
-        <div className="flex-1">
-          <label className="text-white/40 text-[9px] uppercase tracking-widest mono block mb-1">Temp ({unit})</label>
-          <input
-            type="number"
-            value={temp}
-            onChange={e => setTemp(e.target.value)}
-            placeholder={unit === 'F' ? '75' : '24'}
-            className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-bold placeholder:text-white/20 focus:outline-none focus:border-emerald-400"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-white/40 text-[9px] uppercase tracking-widest mono block mb-1">RH %</label>
-          <input
-            type="number"
-            value={rh}
-            onChange={e => setRh(e.target.value)}
-            placeholder="65"
-            className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-bold placeholder:text-white/20 focus:outline-none focus:border-emerald-400"
-          />
-        </div>
-        <button
-          onClick={() => setUnit(u => u === 'F' ? 'C' : 'F')}
-          className="pb-2 text-emerald-400 text-xs font-black mono hover:text-emerald-300 transition"
-        >
-          °{unit === 'F' ? 'C' : 'F'}
-        </button>
-      </div>
-      {vpd && zone && (
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-white/50 text-xs mono">Leaf VPD</span>
-          <div className="text-right">
-            <span className="text-white font-black text-xl mono">{vpd} <span className="text-white/40 text-sm">kPa</span></span>
-            <p className={`text-[10px] font-bold uppercase tracking-widest mono ${zone.color}`}>{zone.label}</p>
-          </div>
-        </div>
-      )}
-    </div>
   );
 };
 
